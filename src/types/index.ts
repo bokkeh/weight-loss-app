@@ -1,0 +1,58 @@
+export interface WeightEntry {
+  id: number;
+  logged_at: string;
+  weight_lbs: number;
+  time_of_day: "morning" | "evening" | null;
+  note?: string;
+  created_at: string;
+}
+
+export interface FoodLogEntry {
+  id: number;
+  logged_at: string;
+  meal_type: "breakfast" | "lunch" | "dinner" | "snack" | null;
+  food_name: string;
+  serving_size?: string;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g: number;
+  source: "manual" | "ai_chat" | "recipe";
+  recipe_id?: number;
+  created_at: string;
+}
+
+export interface Recipe {
+  id: number;
+  name: string;
+  description?: string;
+  servings: number;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g: number;
+  ingredients?: string;
+  instructions?: string;
+  image_url?: string;
+  tags?: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessage {
+  id: number;
+  role: "user" | "model";
+  content: string;
+  food_log_id?: number;
+  created_at: string;
+}
+
+export interface DailyMacroTotals {
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g: number;
+}
