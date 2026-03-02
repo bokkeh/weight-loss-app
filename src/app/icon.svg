@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Teal rounded background -->
+  <rect width="32" height="32" rx="8" fill="#0D9488"/>
+
+  <!-- Bar -->
+  <rect x="10" y="14.5" width="12" height="3" rx="1.5" fill="white"/>
+
+  <!-- Left inner plate -->
+  <rect x="5.5" y="11.5" width="5" height="9" rx="2" fill="white"/>
+
+  <!-- Right inner plate -->
+  <rect x="21.5" y="11.5" width="5" height="9" rx="2" fill="white"/>
+
+  <!-- Left end cap -->
+  <rect x="3" y="13" width="3.5" height="6" rx="1.5" fill="white"/>
+
+  <!-- Right end cap -->
+  <rect x="25.5" y="13" width="3.5" height="6" rx="1.5" fill="white"/>
+</svg>
