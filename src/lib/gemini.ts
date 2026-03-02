@@ -42,7 +42,7 @@ function getGenAI(): GoogleGenerativeAI {
 
 export function getChatModel() {
   return getGenAI().getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: "gemini-2.0-flash",
     systemInstruction: SYSTEM_PROMPT,
   });
 }
@@ -78,7 +78,7 @@ export function stripFoodLogBlock(text: string): string {
 }
 
 export async function estimateMacros(description: string): Promise<FoodLogPayload> {
-  const model = getGenAI().getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
   const prompt = `You are a nutrition database. Estimate the macros for: "${description}"
 
 Return ONLY a valid JSON object — no markdown, no explanation:
