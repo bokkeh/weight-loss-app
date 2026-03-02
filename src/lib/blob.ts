@@ -6,7 +6,9 @@ export async function uploadRecipeImage(
 ): Promise<string> {
   const ext = file.name.split(".").pop() ?? "jpg";
   const filename = `recipes/${recipeId}/${Date.now()}.${ext}`;
-  const { url } = await put(filename, file, { access: "public" });
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) throw new Error("BLOB_READ_WRITE_TOKEN is not set");
+  const { url } = await put(filename, file, { access: "public", token });
   return url;
 }
 

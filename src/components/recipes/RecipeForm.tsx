@@ -111,6 +111,9 @@ export function RecipeForm({ initial, onSaved, onCancel }: Props) {
         if (imgRes.ok) {
           const { image_url } = await imgRes.json();
           recipe = { ...recipe, image_url };
+        } else {
+          const err = await imgRes.json().catch(() => ({}));
+          throw new Error(`Image upload failed: ${err.error ?? imgRes.statusText}`);
         }
       }
 
