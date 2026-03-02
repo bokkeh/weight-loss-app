@@ -46,6 +46,7 @@ export async function POST(req: Request) {
       ingredients,
       instructions,
       tags = [],
+      image_url,
     } = body;
 
     if (!name) {
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
 
     const [recipe] = await sql`
       INSERT INTO recipes
-        (name, description, servings, calories, protein_g, carbs_g, fat_g, fiber_g, ingredients, instructions, tags)
+        (name, description, servings, calories, protein_g, carbs_g, fat_g, fiber_g, ingredients, instructions, image_url, tags)
       VALUES (
         ${name},
         ${description ?? null},
@@ -66,6 +67,7 @@ export async function POST(req: Request) {
         ${Number(fiber_g)},
         ${ingredients ?? null},
         ${instructions ?? null},
+        ${image_url ?? null},
         ${tags}
       )
       RETURNING id, name, description, servings,

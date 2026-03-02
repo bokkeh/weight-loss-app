@@ -30,10 +30,17 @@ export function RecipeForm({ initial, onSaved, onCancel }: Props) {
   });
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>(initial?.tags ?? []);
+
+  // Image state
+  const [imageMode, setImageMode] = useState<"file" | "url">(
+    initial?.image_url ? "url" : "file"
+  );
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageUrlInput, setImageUrlInput] = useState(initial?.image_url ?? "");
   const [imagePreview, setImagePreview] = useState<string | null>(
     initial?.image_url ?? null
   );
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -63,6 +70,22 @@ export function RecipeForm({ initial, onSaved, onCancel }: Props) {
     setImagePreview(URL.createObjectURL(file));
   }
 
+  function handleUrlChange(url: string) {
+    setImageUrlInput(url);
+    setImagePreview(url || null);
+  }
+
+  function switchMode(mode: "file" | "url") {
+    setImageMode(mode);
+    if (mode === "file") {
+      setImageUrlInput("");
+      setImagePreview(imageFile ? URL.createObjectURL(imageFile) : null);
+    } else {
+      setImageFile(null);
+      setImagePreview(imageUrlInput || null);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name) return;
@@ -70,7 +93,7 @@ export function RecipeForm({ initial, onSaved, onCancel }: Props) {
     setError("");
 
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         ...form,
         servings: Number(form.servings) || 1,
         calories: parseFloat(form.calories) || 0,
@@ -80,6 +103,11 @@ export function RecipeForm({ initial, onSaved, onCancel }: Props) {
         fiber_g: parseFloat(form.fiber_g) || 0,
         tags,
       };
+
+      // Include URL-mode image directly in the recipe payload
+      if (imageMode === "url" && imageUrlInput.trim()) {
+        payload.image_url = imageUrlInput.trim();
+      }
 
       let recipe: Recipe;
 
@@ -101,7 +129,8 @@ export function RecipeForm({ initial, onSaved, onCancel }: Props) {
         recipe = await res.json();
       }
 
-      if (imageFile) {
+      // File-mode: upload via Vercel Blob
+      if (imageMode === "file" && imageFile) {
         const fd = new FormData();
         fd.append("image", imageFile);
         const imgRes = await fetch(`/api/recipes/${recipe.id}/image`, {
@@ -126,7 +155,7 @@ export function RecipeForm({ initial, onSaved, onCancel }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4 px-1 pb-4">
       <div className="space-y-1">
         <Label htmlFor="r-name">Recipe Name</Label>
         <Input
@@ -269,22 +298,69 @@ export function RecipeForm({ initial, onSaved, onCancel }: Props) {
         )}
       </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="r-image">Recipe Photo</Label>
-        <Input
-          id="r-image"
-          type="file"
-          accept="image/*"
-          onChange={handleImageChange}
-        />
+      <div className="space-y-2">
+        <Label>Recipe Photo</Label>
+
+        {/* Mode toggle */}
+        <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
+          <button
+            type="button"
+            onClick={() => switchMode("file")}
+            className={`text-xs px-3 py-1 rounded-md transition-colors ${
+              imageMode === "file"
+                ? "bg-background shadow-sm font-medium"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Upload File
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode("url")}
+            className={`text-xs px-3 py-1 rounded-md transition-colors ${
+              imageMode === "url"
+                ? "bg-background shadow-sm font-medium"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Paste URL
+          </button>
+        </div>
+
+        {imageMode === "file" ? (
+          <Input
+            id="r-image"
+            type="file"
+            accept="image/*"
+            onChange={handleImageChange}
+          />
+        ) : (
+          <Input
+            placeholder="https://example.com/photo.jpg"
+            value={imageUrlInput}
+            onChange={(e) => handleUrlChange(e.target.value)}
+          />
+        )}
+
         {imagePreview && (
-          <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden bg-muted">
+          <div className="relative w-full h-44 rounded-lg overflow-hidden bg-muted">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={imagePreview}
               alt="Recipe preview"
               className="w-full h-full object-cover"
             />
+            <button
+              type="button"
+              onClick={() => {
+                setImagePreview(null);
+                setImageFile(null);
+                setImageUrlInput("");
+              }}
+              className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
         )}
       </div>

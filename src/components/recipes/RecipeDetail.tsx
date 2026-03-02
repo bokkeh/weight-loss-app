@@ -52,7 +52,7 @@ export function RecipeDetail({
   if (editing) {
     return (
       <Sheet open={open} onOpenChange={onClose}>
-        <SheetContent className="overflow-y-auto w-full sm:max-w-lg">
+        <SheetContent className="overflow-y-auto w-full sm:max-w-lg px-6">
           <SheetHeader>
             <SheetTitle>Edit Recipe</SheetTitle>
           </SheetHeader>

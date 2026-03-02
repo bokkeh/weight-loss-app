@@ -39,6 +39,7 @@ export async function PUT(req: Request, { params }: Params) {
       ingredients,
       instructions,
       tags,
+      image_url,
     } = body;
 
     const [recipe] = await sql`
@@ -53,6 +54,7 @@ export async function PUT(req: Request, { params }: Params) {
         fiber_g      = COALESCE(${fiber_g != null ? Number(fiber_g) : null}, fiber_g),
         ingredients  = COALESCE(${ingredients ?? null}, ingredients),
         instructions = COALESCE(${instructions ?? null}, instructions),
+        image_url    = COALESCE(${image_url ?? null}, image_url),
         tags         = COALESCE(${tags ?? null}, tags)
       WHERE id = ${Number(id)}
       RETURNING id, name, description, servings,
