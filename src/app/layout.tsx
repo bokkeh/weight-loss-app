@@ -30,8 +30,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background`}
       >
         <PullToRefresh>
-          <main className="max-w-lg mx-auto px-4 py-6 pb-24">
-            {children}
+          <main className="min-h-screen md:pl-56">
+            <div className="max-w-lg mx-auto px-4 py-6 pb-24 md:max-w-4xl md:px-8 md:py-8 md:pb-8">
+              {children}
+            </div>
           </main>
         </PullToRefresh>
         <TabNav />
