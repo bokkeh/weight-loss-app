@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -78,7 +77,7 @@ export function RecipeDetail({
           <SheetTitle className="text-xl">{recipe.name}</SheetTitle>
         </SheetHeader>
 
-        <div className="mt-4 space-y-4">
+        <div className="mt-4 space-y-4 px-4 pb-4">
           {recipe.image_url && (
             <div className="relative w-full h-48 rounded-lg overflow-hidden">
               <Image
