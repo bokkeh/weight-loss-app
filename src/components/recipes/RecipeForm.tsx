@@ -155,7 +155,7 @@ export function RecipeForm({ initial, onSaved, onCancel }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 px-1 pb-4">
+    <form onSubmit={handleSubmit} className="space-y-4 pb-4">
       <div className="space-y-1">
         <Label htmlFor="r-name">Recipe Name</Label>
         <Input
@@ -343,7 +343,7 @@ export function RecipeForm({ initial, onSaved, onCancel }: Props) {
         )}
 
         {imagePreview && (
-          <div className="relative w-full h-44 rounded-lg overflow-hidden bg-muted">
+          <div className="relative h-52 -mx-6 overflow-hidden bg-muted">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={imagePreview}
