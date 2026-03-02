@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 
 const SYSTEM_PROMPT = `You are a knowledgeable, friendly nutrition and diet assistant helping someone track their weight loss journey.
 
@@ -28,23 +28,16 @@ For all other nutrition questions (meal planning, diet advice, calorie goals, re
 
 Always be encouraging, evidence-based, and supportive of the user's weight loss goals.`;
 
-let genAI: GoogleGenerativeAI | null = null;
+let client: OpenAI | null = null;
 
-function getGenAI(): GoogleGenerativeAI {
-  if (!genAI) {
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY environment variable is not set");
+function getClient(): OpenAI {
+  if (!client) {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY environment variable is not set");
     }
-    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   }
-  return genAI;
-}
-
-export function getChatModel() {
-  return getGenAI().getGenerativeModel({
-    model: "gemini-2.0-flash-lite",
-    systemInstruction: SYSTEM_PROMPT,
-  });
+  return client;
 }
 
 export interface FoodLogPayload {
@@ -56,6 +49,27 @@ export interface FoodLogPayload {
   fat_g: number;
   fiber_g: number;
   meal_type: "breakfast" | "lunch" | "dinner" | "snack";
+}
+
+export async function sendChatMessage(
+  message: string,
+  history: { role: string; content: string }[]
+): Promise<string> {
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    { role: "system", content: SYSTEM_PROMPT },
+    ...history.map((m) => ({
+      role: (m.role === "model" ? "assistant" : m.role) as "user" | "assistant",
+      content: m.content,
+    })),
+    { role: "user", content: message },
+  ];
+
+  const response = await getClient().chat.completions.create({
+    model: "gpt-4o-mini",
+    messages,
+  });
+
+  return response.choices[0].message.content ?? "";
 }
 
 export function parseFoodLogBlock(text: string): FoodLogPayload | null {
@@ -78,8 +92,12 @@ export function stripFoodLogBlock(text: string): string {
 }
 
 export async function estimateMacros(description: string): Promise<FoodLogPayload> {
-  const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash-lite" });
-  const prompt = `You are a nutrition database. Estimate the macros for: "${description}"
+  const response = await getClient().chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "user",
+        content: `You are a nutrition database. Estimate the macros for: "${description}"
 
 Return ONLY a valid JSON object — no markdown, no explanation:
 {
@@ -94,12 +112,14 @@ Return ONLY a valid JSON object — no markdown, no explanation:
 }
 
 meal_type must be one of: breakfast, lunch, dinner, snack. Use snack if unclear.
-All numbers must be realistic estimates. Return only the JSON, nothing else.`;
+All numbers must be realistic estimates. Return only the JSON, nothing else.`,
+      },
+    ],
+  });
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text().trim();
+  const text = response.choices[0].message.content?.trim() ?? "";
   const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Gemini did not return valid JSON");
+  if (!jsonMatch) throw new Error("OpenAI did not return valid JSON");
   const parsed = JSON.parse(jsonMatch[0]) as FoodLogPayload;
   const validMealTypes = ["breakfast", "lunch", "dinner", "snack"];
   if (!validMealTypes.includes(parsed.meal_type)) parsed.meal_type = "snack";

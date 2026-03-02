@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import {
-  getChatModel,
+  sendChatMessage,
   parseFoodLogBlock,
   stripFoodLogBlock,
 } from "@/lib/gemini";
@@ -37,17 +37,10 @@ export async function POST(req: Request) {
       LIMIT 40
     `;
 
-    const model = getChatModel();
-
-    // Build Gemini-format history
-    const geminiHistory = (history as { role: string; content: string }[]).map((m) => ({
-      role: m.role as "user" | "model",
-      parts: [{ text: m.content }],
-    }));
-
-    const chat = model.startChat({ history: geminiHistory });
-    const result = await chat.sendMessage(message);
-    const rawReply = result.response.text();
+    const rawReply = await sendChatMessage(
+      message,
+      history as { role: string; content: string }[]
+    );
 
     const foodPayload = parseFoodLogBlock(rawReply);
     const cleanReply = stripFoodLogBlock(rawReply);
