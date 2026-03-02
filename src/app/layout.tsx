@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { TabNav } from "@/components/layout/TabNav";
+import { PullToRefresh } from "@/components/layout/PullToRefresh";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,9 +29,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background`}
       >
-        <main className="max-w-lg mx-auto px-4 py-6 pb-24">
-          {children}
-        </main>
+        <PullToRefresh>
+          <main className="max-w-lg mx-auto px-4 py-6 pb-24">
+            {children}
+          </main>
+        </PullToRefresh>
         <TabNav />
       </body>
     </html>
