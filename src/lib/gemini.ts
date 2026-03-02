@@ -53,10 +53,15 @@ export interface FoodLogPayload {
 
 export async function sendChatMessage(
   message: string,
-  history: { role: string; content: string }[]
+  history: { role: string; content: string }[],
+  foodLogContext?: string
 ): Promise<string> {
+  const systemContent = foodLogContext
+    ? `${SYSTEM_PROMPT}\n\n${foodLogContext}`
+    : SYSTEM_PROMPT;
+
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: systemContent },
     ...history.map((m) => ({
       role: (m.role === "model" ? "assistant" : m.role) as "user" | "assistant",
       content: m.content,
