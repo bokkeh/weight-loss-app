@@ -47,15 +47,32 @@ export async function POST(req: Request) {
       ORDER BY created_at ASC
     `;
 
+    // Fetch recent weight entries for context
+    const recentWeight = await sql`
+      SELECT logged_at::text, weight_lbs::float, time_of_day
+      FROM weight_entries
+      WHERE logged_at >= CURRENT_DATE - INTERVAL '14 days'
+      ORDER BY logged_at DESC, created_at ASC
+      LIMIT 20
+    `;
+
+    let weightContext = "";
+    if (recentWeight.length > 0) {
+      const lines = (recentWeight as Record<string, unknown>[]).map((e) =>
+        `- ${e.logged_at}${e.time_of_day ? ` (${e.time_of_day})` : ""}: ${Number(e.weight_lbs).toFixed(1)} lbs`
+      );
+      weightContext = `\n\nRecent weight log (last 14 days):\n${lines.join("\n")}`;
+    }
+
     let foodLogContext = `Today's food log (${today}):`;
     if (todayFood.length === 0) {
       foodLogContext += " No entries logged yet.";
     } else {
-      const lines = todayFood.map((e: Record<string, unknown>) =>
+      const lines = (todayFood as Record<string, unknown>[]).map((e) =>
         `- ${e.food_name}${e.serving_size ? ` (${e.serving_size})` : ""}: ${Math.round(Number(e.calories))} cal, ${Number(e.protein_g).toFixed(1)}g protein, ${Number(e.carbs_g).toFixed(1)}g carbs, ${Number(e.fat_g).toFixed(1)}g fat [${e.meal_type}]`
       );
-      const totals = todayFood.reduce(
-        (acc: { cal: number; p: number; c: number; f: number }, e: Record<string, unknown>) => ({
+      const totals = (todayFood as Record<string, unknown>[]).reduce(
+        (acc: { cal: number; p: number; c: number; f: number }, e) => ({
           cal: acc.cal + Number(e.calories),
           p: acc.p + Number(e.protein_g),
           c: acc.c + Number(e.carbs_g),
@@ -69,7 +86,7 @@ export async function POST(req: Request) {
     const rawReply = await sendChatMessage(
       message,
       history as { role: string; content: string }[],
-      foodLogContext
+      foodLogContext + weightContext
     );
 
     const foodPayload = parseFoodLogBlock(rawReply);

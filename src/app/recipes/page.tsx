@@ -14,8 +14,9 @@ import {
 import { RecipeCard } from "@/components/recipes/RecipeCard";
 import { RecipeDetail } from "@/components/recipes/RecipeDetail";
 import { RecipeForm } from "@/components/recipes/RecipeForm";
+import { RecipeExplorer } from "@/components/recipes/RecipeExplorer";
 import { Recipe } from "@/types";
-import { Search, Plus, ChefHat } from "lucide-react";
+import { Search, Plus, ChefHat, Sparkles } from "lucide-react";
 
 export default function RecipesPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -24,6 +25,7 @@ export default function RecipesPage() {
   const [selected, setSelected] = useState<Recipe | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [exploreOpen, setExploreOpen] = useState(false);
   const [logSuccess, setLogSuccess] = useState("");
 
   useEffect(() => {
@@ -93,21 +95,34 @@ export default function RecipesPage() {
             Your personal recipe library with macro data.
           </p>
         </div>
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-1" />
-              Add Recipe
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>New Recipe</DialogTitle>
-            </DialogHeader>
-            <RecipeForm onSaved={handleAdded} onCancel={() => setAddOpen(false)} />
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setExploreOpen((v) => !v)}>
+            <Sparkles className="h-4 w-4 mr-1" />
+            Explore with AI
+          </Button>
+          <Dialog open={addOpen} onOpenChange={setAddOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-1" />
+                Add Recipe
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>New Recipe</DialogTitle>
+              </DialogHeader>
+              <RecipeForm onSaved={handleAdded} onCancel={() => setAddOpen(false)} />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
+
+      {exploreOpen && (
+        <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+          <p className="text-sm font-medium">Explore Recipes with AI</p>
+          <RecipeExplorer onSaved={(r) => { handleAdded(r); }} />
+        </div>
+      )}
 
       {logSuccess && (
         <div className="rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 px-4 py-3 text-sm text-green-800 dark:text-green-200 font-medium">
