@@ -28,10 +28,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background`}
       >
-        <TabNav />
-        <main className="max-w-6xl mx-auto px-4 py-6">
+        <main className="max-w-lg mx-auto px-4 py-6 pb-24">
           {children}
         </main>
+        <TabNav />
       </body>
     </html>
   );
