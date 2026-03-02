@@ -76,3 +76,32 @@ export function parseFoodLogBlock(text: string): FoodLogPayload | null {
 export function stripFoodLogBlock(text: string): string {
   return text.replace(/<<<FOOD_LOG>>>[\s\S]*?<<<END_FOOD_LOG>>>/g, "").trim();
 }
+
+export async function estimateMacros(description: string): Promise<FoodLogPayload> {
+  const model = getGenAI().getGenerativeModel({ model: "gemini-1.5-flash" });
+  const prompt = `You are a nutrition database. Estimate the macros for: "${description}"
+
+Return ONLY a valid JSON object — no markdown, no explanation:
+{
+  "food_name": "descriptive name",
+  "serving_size": "amount with unit",
+  "calories": 0,
+  "protein_g": 0,
+  "carbs_g": 0,
+  "fat_g": 0,
+  "fiber_g": 0,
+  "meal_type": "snack"
+}
+
+meal_type must be one of: breakfast, lunch, dinner, snack. Use snack if unclear.
+All numbers must be realistic estimates. Return only the JSON, nothing else.`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text().trim();
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("Gemini did not return valid JSON");
+  const parsed = JSON.parse(jsonMatch[0]) as FoodLogPayload;
+  const validMealTypes = ["breakfast", "lunch", "dinner", "snack"];
+  if (!validMealTypes.includes(parsed.meal_type)) parsed.meal_type = "snack";
+  return parsed;
+}

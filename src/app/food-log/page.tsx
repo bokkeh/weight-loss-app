@@ -14,6 +14,7 @@ import {
 import { FoodEntryForm } from "@/components/food-log/FoodEntryForm";
 import { FoodLogTable } from "@/components/food-log/FoodLogTable";
 import { MacroProgressBars } from "@/components/food-log/MacroProgressBars";
+import { QuickLogBar } from "@/components/food-log/QuickLogBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FoodLogEntry, DailyMacroTotals } from "@/types";
 
@@ -97,6 +98,9 @@ export default function FoodLogPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Quick Log */}
+      <QuickLogBar date={toDateStr(selectedDate)} onAdded={handleAdded} />
 
       {/* Date Navigator */}
       <div className="flex items-center justify-center gap-4">
