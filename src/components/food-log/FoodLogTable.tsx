@@ -79,7 +79,7 @@ export function FoodLogTable({ entries, onDelete }: Props) {
               {sumMacros(items).calories.toFixed(0)} kcal
             </span>
           </div>
-          <div className="rounded-md border overflow-x-auto">
+          <div className="rounded-md border overflow-x-scroll">
             <Table>
               <TableHeader>
                 <TableRow>
