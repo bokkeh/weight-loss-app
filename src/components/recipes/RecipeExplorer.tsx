@@ -76,7 +76,7 @@ export function RecipeExplorer({ onSaved }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="p-[1.5px] rounded-xl bg-gradient-to-r from-violet-400 to-fuchsia-500">
+      <div className="p-[1.5px] rounded-xl bg-gradient-to-r from-violet-400 to-fuchsia-500 shadow-[0_0_18px_rgba(167,139,250,0.45)]">
         <form onSubmit={handleGenerate} className="flex gap-2 bg-background rounded-[10px] px-2 py-1.5">
           <div className="relative flex-1">
             <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-violet-400" />

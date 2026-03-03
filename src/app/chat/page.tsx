@@ -202,7 +202,7 @@ export default function ChatPage() {
         </div>
 
         <div className="border-t p-3">
-          <div className="p-[1.5px] rounded-xl bg-gradient-to-r from-violet-400 to-fuchsia-500">
+          <div className="p-[1.5px] rounded-xl bg-gradient-to-r from-violet-400 to-fuchsia-500 shadow-[0_0_18px_rgba(167,139,250,0.45)]">
             <div className="flex gap-2 bg-background rounded-[10px] px-2 py-1.5">
               <Textarea
                 value={input}

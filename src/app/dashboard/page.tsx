@@ -269,7 +269,7 @@ export default function DashboardPage() {
       </Card>
 
       {/* Weekly AI Summary */}
-      <div className="p-[1.5px] rounded-xl bg-gradient-to-r from-violet-400 to-fuchsia-500">
+      <div className="p-[1.5px] rounded-xl bg-gradient-to-r from-violet-400 to-fuchsia-500 shadow-[0_0_18px_rgba(167,139,250,0.45)]">
         <Card className="rounded-[10px] border-0">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div className="flex items-center gap-2">
