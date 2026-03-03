@@ -23,8 +23,9 @@ import { RecipeCard } from "@/components/recipes/RecipeCard";
 import { RecipeDetail } from "@/components/recipes/RecipeDetail";
 import { RecipeForm } from "@/components/recipes/RecipeForm";
 import { RecipeExplorer } from "@/components/recipes/RecipeExplorer";
+import { RecipeImporter } from "@/components/recipes/RecipeImporter";
 import { Recipe } from "@/types";
-import { Search, Plus, ChefHat, Sparkles, X } from "lucide-react";
+import { Search, Plus, ChefHat, Sparkles, X, Link2 } from "lucide-react";
 
 type SortKey = "newest" | "name" | "cal-asc" | "cal-desc" | "protein-desc";
 
@@ -46,6 +47,7 @@ export default function RecipesPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [exploreOpen, setExploreOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [logSuccess, setLogSuccess] = useState("");
 
   useEffect(() => {
@@ -146,9 +148,18 @@ export default function RecipesPage() {
         </div>
         <div className="flex gap-2 shrink-0">
           <Button
+            variant={importOpen ? "default" : "outline"}
+            size="sm"
+            onClick={() => { setImportOpen((v) => !v); setExploreOpen(false); }}
+            className="gap-1.5"
+          >
+            <Link2 className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Import</span>
+          </Button>
+          <Button
             variant={exploreOpen ? "default" : "outline"}
             size="sm"
-            onClick={() => setExploreOpen((v) => !v)}
+            onClick={() => { setExploreOpen((v) => !v); setImportOpen(false); }}
             className="gap-1.5"
           >
             <Sparkles className="h-3.5 w-3.5" />
@@ -170,6 +181,19 @@ export default function RecipesPage() {
           </Dialog>
         </div>
       </div>
+
+      {/* URL Importer */}
+      {importOpen && (
+        <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold">Import Recipe from URL</p>
+            <button onClick={() => setImportOpen(false)} className="text-muted-foreground hover:text-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <RecipeImporter onSaved={(r) => { handleAdded(r); setImportOpen(false); }} />
+        </div>
+      )}
 
       {/* AI Explorer */}
       {exploreOpen && (
