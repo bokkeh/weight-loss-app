@@ -85,9 +85,9 @@ export function FoodLogTable({ entries, onDelete }: Props) {
                 <TableRow>
                   <TableHead>Food</TableHead>
                   <TableHead className="text-right">Cal</TableHead>
-                  <TableHead className="text-right hidden sm:table-cell">Protein</TableHead>
-                  <TableHead className="text-right hidden sm:table-cell">Carbs</TableHead>
-                  <TableHead className="text-right hidden sm:table-cell">Fat</TableHead>
+                  <TableHead className="text-right">Protein</TableHead>
+                  <TableHead className="text-right">Carbs</TableHead>
+                  <TableHead className="text-right">Fat</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
@@ -113,13 +113,13 @@ export function FoodLogTable({ entries, onDelete }: Props) {
                     <TableCell className="text-right text-sm font-mono">
                       {Number(entry.calories).toFixed(0)}
                     </TableCell>
-                    <TableCell className="text-right text-sm font-mono hidden sm:table-cell">
+                    <TableCell className="text-right text-sm font-mono">
                       {Number(entry.protein_g).toFixed(1)}g
                     </TableCell>
-                    <TableCell className="text-right text-sm font-mono hidden sm:table-cell">
+                    <TableCell className="text-right text-sm font-mono">
                       {Number(entry.carbs_g).toFixed(1)}g
                     </TableCell>
-                    <TableCell className="text-right text-sm font-mono hidden sm:table-cell">
+                    <TableCell className="text-right text-sm font-mono">
                       {Number(entry.fat_g).toFixed(1)}g
                     </TableCell>
                     <TableCell>
@@ -145,9 +145,9 @@ export function FoodLogTable({ entries, onDelete }: Props) {
           <span className="font-semibold">Daily Totals</span>
           <div className="flex gap-4 text-sm font-mono">
             <span className="text-orange-600 font-bold">{totals.calories.toFixed(0)} kcal</span>
-            <span className="text-blue-600 hidden sm:inline">P: {totals.protein_g.toFixed(1)}g</span>
-            <span className="text-yellow-600 hidden sm:inline">C: {totals.carbs_g.toFixed(1)}g</span>
-            <span className="text-red-600 hidden sm:inline">F: {totals.fat_g.toFixed(1)}g</span>
+            <span className="text-blue-600">P: {totals.protein_g.toFixed(1)}g</span>
+            <span className="text-yellow-600">C: {totals.carbs_g.toFixed(1)}g</span>
+            <span className="text-red-600">F: {totals.fat_g.toFixed(1)}g</span>
           </div>
         </div>
       </div>
