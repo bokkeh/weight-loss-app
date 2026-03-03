@@ -170,9 +170,7 @@ export default function FoodLogPage() {
                   ))}
                 </div>
               ) : (
-                <div className="max-h-[520px] overflow-y-auto pr-1">
-                  <FoodLogTable entries={entries} onDelete={handleDelete} />
-                </div>
+                <FoodLogTable entries={entries} onDelete={handleDelete} />
               )}
             </CardContent>
           </Card>
