@@ -171,6 +171,8 @@ export default function RecipesPage() {
                 setSelected(recipe);
                 setDetailOpen(true);
               }}
+              onDeleted={handleDeleted}
+              onPhotoUpdated={handleUpdated}
             />
           ))}
         </div>
