@@ -96,6 +96,54 @@ export function stripFoodLogBlock(text: string): string {
   return text.replace(/<<<FOOD_LOG>>>[\s\S]*?<<<END_FOOD_LOG>>>/g, "").trim();
 }
 
+export async function estimateMacrosFromImage(
+  imageBase64: string,
+  mimeType: string,
+  textHint?: string
+): Promise<FoodLogPayload> {
+  const prompt = `${textHint ? `Context: ${textHint}\n\n` : ""}You are a nutrition database. Look at this food image and estimate the macros for what you see.
+
+Return ONLY a valid JSON object — no markdown, no explanation:
+{
+  "food_name": "descriptive name",
+  "serving_size": "estimated amount with unit",
+  "calories": 0,
+  "protein_g": 0,
+  "carbs_g": 0,
+  "fat_g": 0,
+  "fiber_g": 0,
+  "meal_type": "snack"
+}
+
+meal_type must be one of: breakfast, lunch, dinner, snack. Use snack if unclear.
+All numbers must be realistic estimates based on what you see. Return only the JSON, nothing else.`;
+
+  const response = await getClient().chat.completions.create({
+    model: "gpt-4o",
+    max_tokens: 300,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image_url",
+            image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: "low" },
+          },
+          { type: "text", text: prompt },
+        ],
+      },
+    ],
+  });
+
+  const text = response.choices[0].message.content?.trim() ?? "";
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("OpenAI did not return valid JSON");
+  const parsed = JSON.parse(jsonMatch[0]) as FoodLogPayload;
+  const validMealTypes = ["breakfast", "lunch", "dinner", "snack"];
+  if (!validMealTypes.includes(parsed.meal_type)) parsed.meal_type = "snack";
+  return parsed;
+}
+
 export async function estimateMacros(description: string): Promise<FoodLogPayload> {
   const response = await getClient().chat.completions.create({
     model: "gpt-4o-mini",

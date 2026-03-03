@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
-import { estimateMacros } from "@/lib/gemini";
+import { estimateMacros, estimateMacrosFromImage } from "@/lib/gemini";
 
 export async function POST(req: Request) {
   try {
-    const { text, logged_at } = await req.json();
-    if (!text?.trim()) {
-      return NextResponse.json({ error: "text is required" }, { status: 400 });
+    const { text, imageBase64, mimeType, logged_at } = await req.json();
+    if (!text?.trim() && !imageBase64) {
+      return NextResponse.json({ error: "text or image is required" }, { status: 400 });
     }
 
-    const macros = await estimateMacros(text.trim());
+    const macros = imageBase64
+      ? await estimateMacrosFromImage(imageBase64, mimeType ?? "image/jpeg", text?.trim())
+      : await estimateMacros(text.trim());
 
     const [entry] = await sql`
       INSERT INTO food_log_entries
