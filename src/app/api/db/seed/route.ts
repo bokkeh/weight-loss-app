@@ -73,6 +73,12 @@ export async function POST(req: Request) {
         ON food_log_entries (logged_at DESC)
     `;
 
+    // Migration: add sodium_mg column if it doesn't exist yet
+    await sql`
+      ALTER TABLE food_log_entries
+        ADD COLUMN IF NOT EXISTS sodium_mg NUMERIC(7,1) NOT NULL DEFAULT 0
+    `;
+
     await sql`
       CREATE TABLE IF NOT EXISTS chat_messages (
         id           SERIAL PRIMARY KEY,

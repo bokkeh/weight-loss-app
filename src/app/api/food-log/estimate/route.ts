@@ -15,7 +15,7 @@ export async function POST(req: Request) {
 
     const [entry] = await sql`
       INSERT INTO food_log_entries
-        (logged_at, meal_type, food_name, serving_size, calories, protein_g, carbs_g, fat_g, fiber_g, source)
+        (logged_at, meal_type, food_name, serving_size, calories, protein_g, carbs_g, fat_g, fiber_g, sodium_mg, source)
       VALUES (
         ${logged_at ?? new Date().toISOString().split("T")[0]},
         ${macros.meal_type},
@@ -26,11 +26,12 @@ export async function POST(req: Request) {
         ${macros.carbs_g},
         ${macros.fat_g},
         ${macros.fiber_g},
+        ${macros.sodium_mg ?? 0},
         'ai_chat'
       )
       RETURNING id, logged_at::text, meal_type, food_name, serving_size,
                 calories::float, protein_g::float, carbs_g::float,
-                fat_g::float, fiber_g::float, source, recipe_id, created_at::text
+                fat_g::float, fiber_g::float, sodium_mg::float, source, recipe_id, created_at::text
     `;
 
     return NextResponse.json({ entry, macros }, { status: 201 });

@@ -13,6 +13,7 @@ When the user describes food they have eaten or asks you to log food, you MUST i
   "carbs_g": 0,
   "fat_g": 0,
   "fiber_g": 0,
+  "sodium_mg": 0,
   "meal_type": "breakfast"
 }
 <<<END_FOOD_LOG>>>
@@ -48,6 +49,7 @@ export interface FoodLogPayload {
   carbs_g: number;
   fat_g: number;
   fiber_g: number;
+  sodium_mg: number;
   meal_type: "breakfast" | "lunch" | "dinner" | "snack";
 }
 
@@ -112,6 +114,7 @@ Return ONLY a valid JSON object — no markdown, no explanation:
   "carbs_g": 0,
   "fat_g": 0,
   "fiber_g": 0,
+  "sodium_mg": 0,
   "meal_type": "snack"
 }
 
@@ -161,6 +164,7 @@ Return ONLY a valid JSON object — no markdown, no explanation:
   "carbs_g": 0,
   "fat_g": 0,
   "fiber_g": 0,
+  "sodium_mg": 0,
   "meal_type": "snack"
 }
 

@@ -36,8 +36,9 @@ function sumMacros(entries: FoodLogEntry[]): DailyMacroTotals {
       carbs_g: acc.carbs_g + Number(e.carbs_g),
       fat_g: acc.fat_g + Number(e.fat_g),
       fiber_g: acc.fiber_g + Number(e.fiber_g),
+      sodium_mg: acc.sodium_mg + Number(e.sodium_mg),
     }),
-    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 }
+    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sodium_mg: 0 }
   );
 }
 

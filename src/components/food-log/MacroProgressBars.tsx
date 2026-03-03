@@ -9,6 +9,7 @@ const GOALS = {
   carbs_g: 200,
   fat_g: 65,
   fiber_g: 30,
+  sodium_mg: 2300,
 };
 
 interface Props {
@@ -84,6 +85,13 @@ export function MacroProgressBars({ totals }: Props) {
         goal={GOALS.fiber_g}
         unit="g"
         color="bg-green-500"
+      />
+      <MacroRow
+        label="Sodium"
+        value={totals.sodium_mg}
+        goal={GOALS.sodium_mg}
+        unit="mg"
+        color="bg-cyan-500"
       />
     </div>
   );

@@ -12,7 +12,7 @@ export async function GET(req: Request) {
       entries = await sql`
         SELECT id, logged_at::text, meal_type, food_name, serving_size,
                calories::float, protein_g::float, carbs_g::float,
-               fat_g::float, fiber_g::float, source, recipe_id, created_at::text
+               fat_g::float, fiber_g::float, sodium_mg::float, source, recipe_id, created_at::text
         FROM food_log_entries
         WHERE logged_at = ${date}
         ORDER BY created_at ASC
@@ -21,7 +21,7 @@ export async function GET(req: Request) {
       entries = await sql`
         SELECT id, logged_at::text, meal_type, food_name, serving_size,
                calories::float, protein_g::float, carbs_g::float,
-               fat_g::float, fiber_g::float, source, recipe_id, created_at::text
+               fat_g::float, fiber_g::float, sodium_mg::float, source, recipe_id, created_at::text
         FROM food_log_entries
         WHERE logged_at >= CURRENT_DATE - (${weeks} * INTERVAL '1 week')
         ORDER BY logged_at DESC, created_at ASC
@@ -46,6 +46,7 @@ export async function POST(req: Request) {
       carbs_g,
       fat_g,
       fiber_g,
+      sodium_mg,
       source = "manual",
       recipe_id,
     } = body;
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
 
     const [entry] = await sql`
       INSERT INTO food_log_entries
-        (logged_at, meal_type, food_name, serving_size, calories, protein_g, carbs_g, fat_g, fiber_g, source, recipe_id)
+        (logged_at, meal_type, food_name, serving_size, calories, protein_g, carbs_g, fat_g, fiber_g, sodium_mg, source, recipe_id)
       VALUES (
         ${logged_at ?? new Date().toISOString().split("T")[0]},
         ${meal_type ?? null},
@@ -67,12 +68,13 @@ export async function POST(req: Request) {
         ${Number(carbs_g) || 0},
         ${Number(fat_g) || 0},
         ${Number(fiber_g) || 0},
+        ${Number(sodium_mg) || 0},
         ${source},
         ${recipe_id ?? null}
       )
       RETURNING id, logged_at::text, meal_type, food_name, serving_size,
                 calories::float, protein_g::float, carbs_g::float,
-                fat_g::float, fiber_g::float, source, recipe_id, created_at::text
+                fat_g::float, fiber_g::float, sodium_mg::float, source, recipe_id, created_at::text
     `;
 
     return NextResponse.json(entry, { status: 201 });

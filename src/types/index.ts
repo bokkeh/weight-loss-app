@@ -18,6 +18,7 @@ export interface FoodLogEntry {
   carbs_g: number;
   fat_g: number;
   fiber_g: number;
+  sodium_mg: number;
   source: "manual" | "ai_chat" | "recipe";
   recipe_id?: number;
   created_at: string;
@@ -55,4 +56,5 @@ export interface DailyMacroTotals {
   carbs_g: number;
   fat_g: number;
   fiber_g: number;
+  sodium_mg: number;
 }

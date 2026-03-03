@@ -29,6 +29,7 @@ const emptyForm = {
   carbs_g: "",
   fat_g: "",
   fiber_g: "",
+  sodium_mg: "",
 };
 
 export function FoodEntryForm({ date, onAdded }: Props) {
@@ -58,6 +59,7 @@ export function FoodEntryForm({ date, onAdded }: Props) {
           carbs_g: parseFloat(form.carbs_g) || 0,
           fat_g: parseFloat(form.fat_g) || 0,
           fiber_g: parseFloat(form.fiber_g) || 0,
+          sodium_mg: parseFloat(form.sodium_mg) || 0,
         }),
       });
 
@@ -170,6 +172,18 @@ export function FoodEntryForm({ date, onAdded }: Props) {
             placeholder="g"
             value={form.fiber_g}
             onChange={(e) => setField("fiber_g", e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="sodium">Sodium (mg)</Label>
+          <Input
+            id="sodium"
+            type="number"
+            min="0"
+            step="1"
+            placeholder="mg"
+            value={form.sodium_mg}
+            onChange={(e) => setField("sodium_mg", e.target.value)}
           />
         </div>
       </div>
