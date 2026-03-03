@@ -57,24 +57,26 @@ export function QuickLogBar({ date, onAdded }: Props) {
 
   return (
     <div className="space-y-2">
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <div className="relative flex-1">
-          <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder='e.g. "chicken breast 4oz" or "2 scrambled eggs"'
-            value={text}
-            onChange={(e) => {
-              setText(e.target.value);
-              setError("");
-            }}
-            disabled={loading}
-          />
-        </div>
-        <Button type="submit" disabled={loading || !text.trim()}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Log"}
-        </Button>
-      </form>
+      <div className="p-[1.5px] rounded-xl bg-gradient-to-r from-violet-400 to-fuchsia-500">
+        <form onSubmit={handleSubmit} className="flex gap-2 bg-background rounded-[10px] px-2 py-1.5">
+          <div className="relative flex-1">
+            <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-violet-400" />
+            <Input
+              className="pl-9 border-0 shadow-none focus-visible:ring-0 bg-transparent"
+              placeholder='e.g. "chicken breast 4oz" or "2 scrambled eggs"'
+              value={text}
+              onChange={(e) => {
+                setText(e.target.value);
+                setError("");
+              }}
+              disabled={loading}
+            />
+          </div>
+          <Button type="submit" disabled={loading || !text.trim()} size="sm" className="shrink-0 my-0.5">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Log"}
+          </Button>
+        </form>
+      </div>
 
       {error && <p className="text-xs text-destructive">{error}</p>}
 

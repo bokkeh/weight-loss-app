@@ -201,25 +201,27 @@ export default function ChatPage() {
           <div ref={bottomRef} />
         </div>
 
-        <div className="border-t p-4">
-          <div className="flex gap-2">
-            <Textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask about nutrition, or tell me what you ate... (Enter to send, Shift+Enter for new line)"
-              className="resize-none min-h-[44px] max-h-32"
-              rows={1}
-              disabled={sending}
-            />
-            <Button
-              onClick={handleSend}
-              disabled={!input.trim() || sending}
-              size="icon"
-              className="shrink-0 h-auto"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
+        <div className="border-t p-3">
+          <div className="p-[1.5px] rounded-xl bg-gradient-to-r from-violet-400 to-fuchsia-500">
+            <div className="flex gap-2 bg-background rounded-[10px] px-2 py-1.5">
+              <Textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask about nutrition, or tell me what you ate... (Enter to send, Shift+Enter for new line)"
+                className="resize-none min-h-[44px] max-h-32 border-0 shadow-none focus-visible:ring-0 bg-transparent"
+                rows={1}
+                disabled={sending}
+              />
+              <Button
+                onClick={handleSend}
+                disabled={!input.trim() || sending}
+                size="icon"
+                className="shrink-0 self-end mb-0.5"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </Card>

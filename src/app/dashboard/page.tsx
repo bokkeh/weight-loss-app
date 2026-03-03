@@ -269,38 +269,43 @@ export default function DashboardPage() {
       </Card>
 
       {/* Weekly AI Summary */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-base">Weekly Coach Summary</CardTitle>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleGenerateSummary}
-            disabled={summaryLoading}
-            className="gap-1.5"
-          >
-            {summaryLoading
-              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              : <Sparkles className="h-3.5 w-3.5" />}
-            {summary ? "Refresh" : "Generate"}
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {summaryLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-5/6" />
-              <Skeleton className="h-4 w-4/6" />
+      <div className="p-[1.5px] rounded-xl bg-gradient-to-r from-violet-400 to-fuchsia-500">
+        <Card className="rounded-[10px] border-0">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-violet-400" />
+              <CardTitle className="text-base">Weekly Coach Summary</CardTitle>
             </div>
-          ) : summary ? (
-            <p className="text-sm text-muted-foreground leading-relaxed">{summary}</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Click &ldquo;Generate&rdquo; for a personalized AI recap of your week.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleGenerateSummary}
+              disabled={summaryLoading}
+              className="gap-1.5"
+            >
+              {summaryLoading
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <Sparkles className="h-3.5 w-3.5 text-violet-400" />}
+              {summary ? "Refresh" : "Generate"}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {summaryLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-4 w-4/6" />
+              </div>
+            ) : summary ? (
+              <p className="text-sm text-muted-foreground leading-relaxed">{summary}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Click &ldquo;Generate&rdquo; for a personalized AI recap of your week.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

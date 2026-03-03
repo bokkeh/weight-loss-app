@@ -76,21 +76,23 @@ export function RecipeExplorer({ onSaved }: Props) {
 
   return (
     <div className="space-y-4">
-      <form onSubmit={handleGenerate} className="flex gap-2">
-        <div className="relative flex-1">
-          <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder='e.g. "high protein", "low carb", "quick meals", "vegetarian"'
-            value={preferences}
-            onChange={(e) => setPreferences(e.target.value)}
-            disabled={loading}
-          />
-        </div>
-        <Button type="submit" disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Generate"}
-        </Button>
-      </form>
+      <div className="p-[1.5px] rounded-xl bg-gradient-to-r from-violet-400 to-fuchsia-500">
+        <form onSubmit={handleGenerate} className="flex gap-2 bg-background rounded-[10px] px-2 py-1.5">
+          <div className="relative flex-1">
+            <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-violet-400" />
+            <Input
+              className="pl-9 border-0 shadow-none focus-visible:ring-0 bg-transparent"
+              placeholder='e.g. "high protein", "low carb", "quick meals", "vegetarian"'
+              value={preferences}
+              onChange={(e) => setPreferences(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+          <Button type="submit" disabled={loading} size="sm" className="shrink-0 my-0.5">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Generate"}
+          </Button>
+        </form>
+      </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
