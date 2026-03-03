@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Recipe } from "@/types";
@@ -17,11 +16,11 @@ export function RecipeCard({ recipe, onClick }: Props) {
     >
       <div className="relative h-40 bg-muted">
         {recipe.image_url ? (
-          <Image
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
             src={recipe.image_url}
             alt={recipe.name}
-            fill
-            className="object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
           <div className="h-full flex items-center justify-center text-muted-foreground">
