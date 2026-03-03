@@ -76,7 +76,7 @@ export default function DashboardPage() {
   const [weeklyAvgCalories, setWeeklyAvgCalories] = useState<number | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
-  const [calorieGoal, setCalorieGoal] = useState(2000);
+  const [calorieGoal, setCalorieGoal] = useState(2100);
 
   useEffect(() => {
     const saved = localStorage.getItem("calorieGoal");
@@ -208,7 +208,7 @@ export default function DashboardPage() {
           <StatCard
             title="Today's Protein"
             value={`${todayTotals.protein_g.toFixed(0)}g`}
-            subtitle="Goal: 150g"
+            subtitle="Goal: 180g"
             icon={<Beef className="h-5 w-5 text-purple-600" />}
             color="bg-purple-50 dark:bg-purple-950"
           />

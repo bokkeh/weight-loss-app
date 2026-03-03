@@ -4,10 +4,10 @@ import { Progress } from "@/components/ui/progress";
 import { DailyMacroTotals } from "@/types";
 
 const GOALS = {
-  calories: 2000,
-  protein_g: 150,
-  carbs_g: 200,
-  fat_g: 65,
+  calories: 2100,
+  protein_g: 180,
+  carbs_g: 170,
+  fat_g: 75,
   fiber_g: 30,
   sodium_mg: 2300,
 };
