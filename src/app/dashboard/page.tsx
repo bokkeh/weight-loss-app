@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WeeklyWeightChart } from "@/components/dashboard/WeeklyWeightChart";
 import { WeeklyCaloriesChart } from "@/components/dashboard/WeeklyCaloriesChart";
 import { MacroDonutChart } from "@/components/dashboard/MacroDonutChart";
+import { DailyQuote } from "@/components/dashboard/DailyQuote";
 import { WeightEntry, FoodLogEntry, DailyMacroTotals } from "@/types";
-import { Scale, Flame, Beef, TrendingDown } from "lucide-react";
+import { Scale, Flame, Beef, TrendingDown, Sparkles, Download, Loader2 } from "lucide-react";
 
 function sumMacros(entries: FoodLogEntry[]): DailyMacroTotals {
   return entries.reduce(
@@ -22,22 +24,39 @@ function sumMacros(entries: FoodLogEntry[]): DailyMacroTotals {
   );
 }
 
+function getWeekKey() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 1);
+  const week = Math.ceil(((now.getTime() - start.getTime()) / 86400000 + start.getDay() + 1) / 7);
+  return `${now.getFullYear()}-W${week}`;
+}
+
+function downloadCSV(filename: string, rows: string[][]) {
+  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
 interface StatCardProps {
   title: string;
   value: string;
   subtitle: string;
   icon: React.ReactNode;
   color: string;
+  valueColor?: string;
 }
 
-function StatCard({ title, value, subtitle, icon, color }: StatCardProps) {
+function StatCard({ title, value, subtitle, icon, color, valueColor }: StatCardProps) {
   return (
     <Card>
       <CardContent className="pt-6">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-sm text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold mt-1">{value}</p>
+            <p className={`text-2xl font-bold mt-1 ${valueColor ?? ""}`}>{value}</p>
             <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
           </div>
           <div className={`p-2 rounded-lg ${color}`}>{icon}</div>
@@ -52,28 +71,74 @@ export default function DashboardPage() {
   const [foodEntries, setFoodEntries] = useState<FoodLogEntry[]>([]);
   const [todayFood, setTodayFood] = useState<FoodLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [streak, setStreak] = useState<number | null>(null);
+  const [weeklyAvgCalories, setWeeklyAvgCalories] = useState<number | null>(null);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [calorieGoal, setCalorieGoal] = useState(2000);
 
   useEffect(() => {
+    const saved = localStorage.getItem("calorieGoal");
+    if (saved) setCalorieGoal(parseFloat(saved));
+    const weekKey = getWeekKey();
+    const cached = localStorage.getItem(`weeklySummary_${weekKey}`);
+    if (cached) setSummary(cached);
+
     async function load() {
       const today = new Date().toISOString().split("T")[0];
-      const [w, f, t] = await Promise.all([
+      const [w, f, t, s] = await Promise.all([
         fetch("/api/weight?weeks=4").then((r) => r.json()),
         fetch("/api/food-log?weeks=1").then((r) => r.json()),
         fetch(`/api/food-log?date=${today}`).then((r) => r.json()),
+        fetch("/api/stats").then((r) => r.json()),
       ]);
-      setWeightEntries(w);
-      setFoodEntries(f);
-      setTodayFood(t);
+      setWeightEntries(Array.isArray(w) ? w : []);
+      setFoodEntries(Array.isArray(f) ? f : []);
+      setTodayFood(Array.isArray(t) ? t : []);
+      if (!s.error) {
+        setStreak(s.streak ?? 0);
+        setWeeklyAvgCalories(s.weeklyAvgCalories ?? null);
+      }
       setLoading(false);
     }
     load();
   }, []);
 
-  const todayTotals = sumMacros(todayFood);
+  async function handleGenerateSummary() {
+    setSummaryLoading(true);
+    try {
+      const res = await fetch("/api/chat/weekly-summary");
+      const data = await res.json();
+      if (data.summary) {
+        setSummary(data.summary);
+        localStorage.setItem(`weeklySummary_${getWeekKey()}`, data.summary);
+      }
+    } finally {
+      setSummaryLoading(false);
+    }
+  }
 
-  const sortedWeight = [...weightEntries].sort((a, b) =>
-    b.logged_at.localeCompare(a.logged_at)
-  );
+  async function handleExportCSV() {
+    const [allWeight, allFood] = await Promise.all([
+      fetch("/api/weight?weeks=520").then((r) => r.json()),
+      fetch("/api/food-log?weeks=520").then((r) => r.json()),
+    ]);
+    downloadCSV("weight-log.csv", [
+      ["Date", "Weight (lbs)", "Note"],
+      ...(allWeight as WeightEntry[]).map((e) => [e.logged_at, String(e.weight_lbs), e.note ?? ""]),
+    ]);
+    downloadCSV("food-log.csv", [
+      ["Date", "Food", "Meal", "Calories", "Protein(g)", "Carbs(g)", "Fat(g)", "Fiber(g)", "Serving"],
+      ...(allFood as FoodLogEntry[]).map((e) => [
+        e.logged_at, e.food_name, e.meal_type ?? "",
+        String(e.calories), String(e.protein_g), String(e.carbs_g), String(e.fat_g), String(e.fiber_g),
+        e.serving_size ?? "",
+      ]),
+    ]);
+  }
+
+  const todayTotals = sumMacros(todayFood);
+  const sortedWeight = [...weightEntries].sort((a, b) => b.logged_at.localeCompare(a.logged_at));
   const latestWeight = sortedWeight[0];
   const prevWeight = sortedWeight[1];
   const weightChange =
@@ -88,62 +153,54 @@ export default function DashboardPage() {
     return d >= weekAgo;
   });
 
+  const weeklyDeficit = weeklyAvgCalories !== null ? calorieGoal - weeklyAvgCalories : null;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Your progress at a glance.
-        </p>
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground text-sm mt-1">Your progress at a glance.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-1.5 shrink-0">
+          <Download className="h-3.5 w-3.5" />
+          Export CSV
+        </Button>
       </div>
 
+      {/* Daily Quote */}
+      <DailyQuote />
+
+      {/* Main stat cards */}
       {loading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-28" />
-          ))}
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28" />)}
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             title="Current Weight"
-            value={
-              latestWeight ? `${Number(latestWeight.weight_lbs).toFixed(1)} lbs` : "—"
-            }
-            subtitle={
-              latestWeight
-                ? new Date(latestWeight.logged_at + "T12:00:00").toLocaleDateString(
-                    "en-US",
-                    { month: "short", day: "numeric" }
-                  )
-                : "No entries yet"
-            }
+            value={latestWeight ? `${Number(latestWeight.weight_lbs).toFixed(1)} lbs` : "—"}
+            subtitle={latestWeight
+              ? new Date(latestWeight.logged_at + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+              : "No entries yet"}
             icon={<Scale className="h-5 w-5 text-blue-600" />}
             color="bg-blue-50 dark:bg-blue-950"
           />
           <StatCard
             title="Since Last Log"
-            value={
-              weightChange !== null
-                ? `${weightChange > 0 ? "+" : ""}${weightChange.toFixed(1)} lbs`
-                : "—"
-            }
-            subtitle={
-              weightChange !== null
-                ? weightChange < 0
-                  ? "Keep it up!"
-                  : weightChange > 0
-                  ? "Slight increase"
-                  : "No change"
-                : "Log more entries"
-            }
+            value={weightChange !== null ? `${weightChange > 0 ? "+" : ""}${weightChange.toFixed(1)} lbs` : "—"}
+            subtitle={weightChange !== null
+              ? weightChange < 0 ? "Keep it up!" : weightChange > 0 ? "Slight increase" : "No change"
+              : "Log more entries"}
             icon={<TrendingDown className="h-5 w-5 text-green-600" />}
             color="bg-green-50 dark:bg-green-950"
           />
           <StatCard
             title="Today's Calories"
             value={`${todayTotals.calories.toFixed(0)} kcal`}
-            subtitle="Goal: 2,000 kcal"
+            subtitle={`Goal: ${calorieGoal.toLocaleString()} kcal`}
             icon={<Flame className="h-5 w-5 text-orange-600" />}
             color="bg-orange-50 dark:bg-orange-950"
           />
@@ -157,30 +214,47 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Streak + Deficit */}
+      {!loading && (
+        <div className="grid sm:grid-cols-2 gap-4">
+          <StatCard
+            title="Logging Streak"
+            value={streak !== null ? `${streak} day${streak !== 1 ? "s" : ""}` : "—"}
+            subtitle={streak ? (streak >= 7 ? "Amazing consistency! 🔥" : "Keep going!") : "Log today to start"}
+            icon={<Flame className="h-5 w-5 text-amber-500" />}
+            color="bg-amber-50 dark:bg-amber-950"
+          />
+          <StatCard
+            title="Weekly Avg Deficit"
+            value={weeklyDeficit !== null
+              ? `${weeklyDeficit >= 0 ? "-" : "+"}${Math.abs(weeklyDeficit).toFixed(0)} kcal/day`
+              : "—"}
+            subtitle={weeklyAvgCalories !== null
+              ? `Avg ${weeklyAvgCalories.toFixed(0)} kcal/day vs ${calorieGoal} goal`
+              : "No food logged this week"}
+            icon={<TrendingDown className={`h-5 w-5 ${weeklyDeficit !== null && weeklyDeficit >= 0 ? "text-green-600" : "text-red-500"}`} />}
+            color={weeklyDeficit !== null && weeklyDeficit >= 0 ? "bg-green-50 dark:bg-green-950" : "bg-red-50 dark:bg-red-950"}
+            valueColor={weeklyDeficit !== null && weeklyDeficit >= 0 ? "text-green-600" : weeklyDeficit !== null ? "text-red-500" : ""}
+          />
+        </div>
+      )}
+
+      {/* Charts */}
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Weight — Last 4 Weeks</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <Skeleton className="h-48 w-full" />
-            ) : (
-              <WeeklyWeightChart entries={weeklyWeightEntries} />
-            )}
+            {loading ? <Skeleton className="h-48 w-full" /> : <WeeklyWeightChart entries={weeklyWeightEntries} />}
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Calories — Last 7 Days</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <Skeleton className="h-48 w-full" />
-            ) : (
-              <WeeklyCaloriesChart entries={foodEntries} />
-            )}
+            {loading ? <Skeleton className="h-48 w-full" /> : <WeeklyCaloriesChart entries={foodEntries} />}
           </CardContent>
         </Card>
       </div>
@@ -190,10 +264,40 @@ export default function DashboardPage() {
           <CardTitle className="text-base">Today&apos;s Macro Split</CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <Skeleton className="h-48 w-full" />
+          {loading ? <Skeleton className="h-48 w-full" /> : <MacroDonutChart totals={todayTotals} />}
+        </CardContent>
+      </Card>
+
+      {/* Weekly AI Summary */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-base">Weekly Coach Summary</CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleGenerateSummary}
+            disabled={summaryLoading}
+            className="gap-1.5"
+          >
+            {summaryLoading
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : <Sparkles className="h-3.5 w-3.5" />}
+            {summary ? "Refresh" : "Generate"}
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {summaryLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-4 w-4/6" />
+            </div>
+          ) : summary ? (
+            <p className="text-sm text-muted-foreground leading-relaxed">{summary}</p>
           ) : (
-            <MacroDonutChart totals={todayTotals} />
+            <p className="text-sm text-muted-foreground">
+              Click &ldquo;Generate&rdquo; for a personalized AI recap of your week.
+            </p>
           )}
         </CardContent>
       </Card>

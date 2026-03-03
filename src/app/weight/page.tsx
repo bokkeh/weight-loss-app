@@ -12,6 +12,7 @@ import {
 import { WeightEntryForm } from "@/components/weight/WeightEntryForm";
 import { WeightTrendChart } from "@/components/weight/WeightTrendChart";
 import { WeightHistoryTable } from "@/components/weight/WeightHistoryTable";
+import { GoalWeightCard } from "@/components/weight/GoalWeightCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WeightEntry } from "@/types";
 
@@ -19,6 +20,16 @@ export default function WeightPage() {
   const [entries, setEntries] = useState<WeightEntry[]>([]);
   const [weeks, setWeeks] = useState("12");
   const [loading, setLoading] = useState(true);
+  const [goalWeight, setGoalWeight] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    const v = localStorage.getItem("goalWeight");
+    return v ? parseFloat(v) : null;
+  });
+
+  function handleGoalSet(goal: number) {
+    setGoalWeight(goal);
+    localStorage.setItem("goalWeight", String(goal));
+  }
 
   const fetchEntries = useCallback(async () => {
     setLoading(true);
@@ -44,12 +55,9 @@ export default function WeightPage() {
     setEntries((prev) => prev.filter((e) => e.id !== id));
   }
 
-  const latestWeight = entries.length > 0
-    ? Math.max(...entries.map((e) => new Date(e.logged_at).getTime()))
-    : null;
-  const latestEntry = latestWeight
-    ? entries.find((e) => new Date(e.logged_at).getTime() === latestWeight)
-    : null;
+  const sortedEntries = [...entries].sort((a, b) => b.logged_at.localeCompare(a.logged_at));
+  const latestEntry = sortedEntries[0] ?? null;
+  const oldestEntry = sortedEntries[sortedEntries.length - 1] ?? null;
 
   return (
     <div className="space-y-6">
@@ -81,6 +89,12 @@ export default function WeightPage() {
               </CardContent>
             </Card>
           )}
+          <GoalWeightCard
+            startWeight={oldestEntry ? Number(oldestEntry.weight_lbs) : null}
+            currentWeight={latestEntry ? Number(latestEntry.weight_lbs) : null}
+            goalWeight={goalWeight}
+            onGoalSet={handleGoalSet}
+          />
         </div>
 
         <div className="lg:col-span-2 space-y-6">
@@ -103,7 +117,7 @@ export default function WeightPage() {
               {loading ? (
                 <Skeleton className="h-64 w-full" />
               ) : (
-                <WeightTrendChart entries={entries} />
+                <WeightTrendChart entries={entries} goalWeight={goalWeight ?? undefined} />
               )}
             </CardContent>
           </Card>
