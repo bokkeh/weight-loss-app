@@ -31,13 +31,13 @@ function MacroRow({
   const pct = Math.min((value / goal) * 100, 100);
   return (
     <div className="space-y-1">
-      <div className="flex justify-between text-sm">
+      <div className="flex justify-between text-xs">
         <span className="font-medium">{label}</span>
-        <span className="text-muted-foreground">
-          {value.toFixed(0)} / {goal} {unit}
+        <span className="text-muted-foreground tabular-nums">
+          {value.toFixed(0)}<span className="text-muted-foreground/60">/{goal}{unit}</span>
         </span>
       </div>
-      <div className="relative h-2.5 rounded-full bg-muted overflow-hidden">
+      <div className="relative h-2 rounded-full bg-muted overflow-hidden">
         <div
           className={`h-full rounded-full transition-all ${color}`}
           style={{ width: `${pct}%` }}

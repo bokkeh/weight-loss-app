@@ -1,9 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -16,12 +24,24 @@ import { RecipeDetail } from "@/components/recipes/RecipeDetail";
 import { RecipeForm } from "@/components/recipes/RecipeForm";
 import { RecipeExplorer } from "@/components/recipes/RecipeExplorer";
 import { Recipe } from "@/types";
-import { Search, Plus, ChefHat, Sparkles } from "lucide-react";
+import { Search, Plus, ChefHat, Sparkles, X } from "lucide-react";
+
+type SortKey = "newest" | "name" | "cal-asc" | "cal-desc" | "protein-desc";
+
+const SORT_LABELS: Record<SortKey, string> = {
+  newest: "Newest",
+  name: "Name A–Z",
+  "cal-asc": "Calories ↑",
+  "cal-desc": "Calories ↓",
+  "protein-desc": "Protein ↓",
+};
 
 export default function RecipesPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [sort, setSort] = useState<SortKey>("newest");
   const [selected, setSelected] = useState<Recipe | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -52,6 +72,7 @@ export default function RecipesPage() {
 
   function handleDeleted(id: number) {
     setRecipes((prev) => prev.filter((r) => r.id !== id));
+    if (selected?.id === id) setDetailOpen(false);
   }
 
   async function handleLogAsFood(recipe: Recipe) {
@@ -62,7 +83,7 @@ export default function RecipesPage() {
       body: JSON.stringify({
         logged_at: today,
         food_name: recipe.name,
-        serving_size: `1 serving`,
+        serving_size: "1 serving",
         calories: recipe.calories,
         protein_g: recipe.protein_g,
         carbs_g: recipe.carbs_g,
@@ -77,34 +98,67 @@ export default function RecipesPage() {
     setTimeout(() => setLogSuccess(""), 4000);
   }
 
-  const filtered = recipes.filter((r) => {
-    const q = search.toLowerCase();
-    return (
-      !q ||
-      r.name.toLowerCase().includes(q) ||
-      r.tags?.some((t) => t.toLowerCase().includes(q))
-    );
-  });
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    recipes.forEach((r) => r.tags?.forEach((t) => set.add(t)));
+    return [...set].sort();
+  }, [recipes]);
+
+  const filtered = useMemo(() => {
+    let list = recipes.filter((r) => {
+      const q = search.toLowerCase();
+      const matchesSearch =
+        !q ||
+        r.name.toLowerCase().includes(q) ||
+        r.tags?.some((t) => t.toLowerCase().includes(q));
+      const matchesTag = !activeTag || r.tags?.includes(activeTag);
+      return matchesSearch && matchesTag;
+    });
+
+    switch (sort) {
+      case "name":
+        list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case "cal-asc":
+        list = [...list].sort((a, b) => Number(a.calories) - Number(b.calories));
+        break;
+      case "cal-desc":
+        list = [...list].sort((a, b) => Number(b.calories) - Number(a.calories));
+        break;
+      case "protein-desc":
+        list = [...list].sort((a, b) => Number(b.protein_g) - Number(a.protein_g));
+        break;
+    }
+    return list;
+  }, [recipes, search, activeTag, sort]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between">
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Recipes</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Your personal recipe library with macro data.
+          <p className="text-muted-foreground text-sm mt-0.5">
+            {recipes.length > 0
+              ? `${recipes.length} recipe${recipes.length !== 1 ? "s" : ""} in your library`
+              : "Your personal recipe library."}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setExploreOpen((v) => !v)}>
-            <Sparkles className="h-4 w-4 mr-1" />
-            Explore with AI
+        <div className="flex gap-2 shrink-0">
+          <Button
+            variant={exploreOpen ? "default" : "outline"}
+            size="sm"
+            onClick={() => setExploreOpen((v) => !v)}
+            className="gap-1.5"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Explore</span>
           </Button>
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-1" />
-                Add Recipe
+              <Button size="sm" className="gap-1.5">
+                <Plus className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Add Recipe</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -117,9 +171,15 @@ export default function RecipesPage() {
         </div>
       </div>
 
+      {/* AI Explorer */}
       {exploreOpen && (
-        <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-          <p className="text-sm font-medium">Explore Recipes with AI</p>
+        <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold">Explore Recipes with AI</p>
+            <button onClick={() => setExploreOpen(false)} className="text-muted-foreground hover:text-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
           <RecipeExplorer onSaved={(r) => { handleAdded(r); }} />
         </div>
       )}
@@ -130,21 +190,50 @@ export default function RecipesPage() {
         </div>
       )}
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search recipes or tags..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+      {/* Search + Sort */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search recipes or tags..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+          <SelectTrigger className="w-36 shrink-0">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+              <SelectItem key={k} value={k}>{SORT_LABELS[k]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
+      {/* Tag filter row */}
+      {allTags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {allTags.map((tag) => (
+            <Badge
+              key={tag}
+              variant={activeTag === tag ? "default" : "secondary"}
+              className="cursor-pointer select-none text-xs gap-1"
+              onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+            >
+              {tag}
+              {activeTag === tag && <X className="h-2.5 w-2.5" />}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      {/* Grid */}
       {loading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <Skeleton key={i} className="h-64" />
-          ))}
+          {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-64" />)}
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
@@ -152,30 +241,40 @@ export default function RecipesPage() {
           {recipes.length === 0 ? (
             <>
               <p className="font-medium">No recipes yet</p>
-              <p className="text-sm mt-1">Add your first recipe to get started.</p>
+              <p className="text-sm mt-1">Add your first or explore with AI above.</p>
             </>
           ) : (
             <>
-              <p className="font-medium">No recipes match your search</p>
-              <p className="text-sm mt-1">Try different keywords or tags.</p>
+              <p className="font-medium">No matches</p>
+              <button
+                className="text-sm mt-1 underline text-muted-foreground"
+                onClick={() => { setSearch(""); setActiveTag(null); }}
+              >
+                Clear filters
+              </button>
             </>
           )}
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((recipe) => (
-            <RecipeCard
-              key={recipe.id}
-              recipe={recipe}
-              onClick={() => {
-                setSelected(recipe);
-                setDetailOpen(true);
-              }}
-              onDeleted={handleDeleted}
-              onPhotoUpdated={handleUpdated}
-            />
-          ))}
-        </div>
+        <>
+          {(search || activeTag) && (
+            <p className="text-xs text-muted-foreground -mb-1">
+              {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+              {activeTag && <> · <strong>{activeTag}</strong></>}
+            </p>
+          )}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map((recipe) => (
+              <RecipeCard
+                key={recipe.id}
+                recipe={recipe}
+                onClick={() => { setSelected(recipe); setDetailOpen(true); }}
+                onDeleted={handleDeleted}
+                onPhotoUpdated={handleUpdated}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       <RecipeDetail

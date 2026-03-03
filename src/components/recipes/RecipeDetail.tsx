@@ -78,9 +78,9 @@ export function RecipeDetail({
           <SheetTitle className="text-xl">{recipe.name}</SheetTitle>
         </SheetHeader>
 
-        <div className="mt-4 space-y-4 px-4 pb-4">
+        <div className="mt-2 space-y-4 pb-4">
           {recipe.image_url && (
-            <div className="relative w-full h-48 rounded-lg overflow-hidden">
+            <div className="relative h-52 -mx-6 overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={recipe.image_url}
