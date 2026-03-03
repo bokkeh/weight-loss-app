@@ -80,7 +80,7 @@ export function FoodLogTable({ entries, onDelete }: Props) {
             </span>
           </div>
           <div className="rounded-md border overflow-x-auto">
-            <Table>
+            <Table className="min-w-[480px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Food</TableHead>

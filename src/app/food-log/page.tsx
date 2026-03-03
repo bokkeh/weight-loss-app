@@ -78,7 +78,7 @@ export default function FoodLogPage() {
   const totals = sumMacros(entries);
 
   return (
-    <div className="space-y-6 overflow-x-hidden">
+    <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold">Food Log</h1>
