@@ -11,6 +11,7 @@ import { DailyQuote } from "@/components/dashboard/DailyQuote";
 import { WeightEntry, FoodLogEntry, DailyMacroTotals } from "@/types";
 import { Scale, Flame, Beef, TrendingDown, Sparkles, Download, Loader2, Share2, Check } from "lucide-react";
 import { shareOrCopy } from "@/lib/shareUtils";
+import { localDateStr } from "@/lib/utils";
 
 function sumMacros(entries: FoodLogEntry[]): DailyMacroTotals {
   return entries.reduce(
@@ -88,12 +89,12 @@ export default function DashboardPage() {
     if (cached) setSummary(cached);
 
     async function load() {
-      const today = new Date().toISOString().split("T")[0];
+      const today = localDateStr();
       const [w, f, t, s] = await Promise.all([
         fetch("/api/weight?weeks=4").then((r) => r.json()),
         fetch("/api/food-log?weeks=1").then((r) => r.json()),
         fetch(`/api/food-log?date=${today}`).then((r) => r.json()),
-        fetch("/api/stats").then((r) => r.json()),
+        fetch(`/api/stats?today=${today}`).then((r) => r.json()),
       ]);
       setWeightEntries(Array.isArray(w) ? w : []);
       setFoodEntries(Array.isArray(f) ? f : []);

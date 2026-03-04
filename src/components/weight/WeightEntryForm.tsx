@@ -8,13 +8,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sunrise, Sunset } from "lucide-react";
 import { WeightEntry } from "@/types";
+import { localDateStr } from "@/lib/utils";
 
 interface Props {
   onAdded: (entry: WeightEntry) => void;
 }
 
 export function WeightEntryForm({ onAdded }: Props) {
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateStr();
   const [date, setDate] = useState(today);
   const [morning, setMorning] = useState("");
   const [evening, setEvening] = useState("");

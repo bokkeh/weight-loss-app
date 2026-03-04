@@ -18,6 +18,7 @@ import { QuickLogBar } from "@/components/food-log/QuickLogBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FoodLogEntry, DailyMacroTotals } from "@/types";
 import { shareOrCopy } from "@/lib/shareUtils";
+import { localDateStr } from "@/lib/utils";
 
 const GOALS = { calories: 2100, protein_g: 180, carbs_g: 170, fat_g: 75, fiber_g: 30 };
 
@@ -29,7 +30,7 @@ const MEAL_EMOJI: Record<string, string> = {
 };
 
 function toDateStr(d: Date) {
-  return d.toISOString().split("T")[0];
+  return localDateStr(d);
 }
 
 function shiftDate(d: Date, days: number): Date {

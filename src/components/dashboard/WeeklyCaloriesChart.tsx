@@ -1,5 +1,6 @@
 "use client";
 
+import { localDateStr } from "@/lib/utils";
 import {
   BarChart,
   Bar,
@@ -29,7 +30,7 @@ export function WeeklyCaloriesChart({ entries, calorieGoal = 2000 }: Props) {
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split("T")[0];
+    const dateStr = localDateStr(d);
     data.push({
       date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       calories: byDate[dateStr] ?? 0,
