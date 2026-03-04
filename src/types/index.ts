@@ -50,6 +50,14 @@ export interface ChatMessage {
   created_at: string;
 }
 
+export interface WaterLogEntry {
+  id: number;
+  logged_at: string;
+  ounces: number;
+  source: string;
+  created_at: string;
+}
+
 export interface DailyMacroTotals {
   calories: number;
   protein_g: number;

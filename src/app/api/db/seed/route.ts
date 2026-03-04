@@ -89,6 +89,22 @@ export async function POST(req: Request) {
       )
     `;
 
+    // Water log table
+    await sql`
+      CREATE TABLE IF NOT EXISTS water_log_entries (
+        id         SERIAL PRIMARY KEY,
+        logged_at  DATE          NOT NULL DEFAULT CURRENT_DATE,
+        ounces     NUMERIC(5,1)  NOT NULL DEFAULT 8,
+        source     TEXT          NOT NULL DEFAULT 'sodium_widget',
+        created_at TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+      )
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_water_log_logged_at
+        ON water_log_entries (logged_at DESC)
+    `;
+
     await sql`
       CREATE OR REPLACE FUNCTION update_updated_at_column()
       RETURNS TRIGGER AS $$

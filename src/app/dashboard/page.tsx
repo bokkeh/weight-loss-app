@@ -8,6 +8,7 @@ import { WeeklyWeightChart } from "@/components/dashboard/WeeklyWeightChart";
 import { WeeklyCaloriesChart } from "@/components/dashboard/WeeklyCaloriesChart";
 import { MacroDonutChart } from "@/components/dashboard/MacroDonutChart";
 import { DailyQuote } from "@/components/dashboard/DailyQuote";
+import { WaterWidget } from "@/components/dashboard/WaterWidget";
 import { WeightEntry, FoodLogEntry, DailyMacroTotals } from "@/types";
 import { Scale, Flame, Beef, TrendingDown, Sparkles, Download, Loader2, Share2, Check } from "lucide-react";
 import { shareOrCopy } from "@/lib/shareUtils";
@@ -284,6 +285,14 @@ export default function DashboardPage() {
             valueColor={weeklyDeficit !== null && weeklyDeficit >= 0 ? "text-green-600" : weeklyDeficit !== null ? "text-red-500" : ""}
           />
         </div>
+      )}
+
+      {/* Water Widget */}
+      {!loading && (
+        <WaterWidget
+          sodiumMgToday={todayTotals.sodium_mg}
+          hasFoodLogged={todayFood.length > 0}
+        />
       )}
 
       {/* Charts */}
