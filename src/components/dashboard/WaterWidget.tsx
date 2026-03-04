@@ -83,6 +83,7 @@ export function WaterWidget({ sodiumMgToday, hasFoodLogged }: WaterWidgetProps) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ logged_at: today, ounces: GLASS_OZ, source: "sodium_widget" }),
       });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
       const saved: WaterLogEntry = await res.json();
 
       // Replace optimistic with real
@@ -93,9 +94,10 @@ export function WaterWidget({ sodiumMgToday, hasFoodLogged }: WaterWidgetProps) 
       setUndoId(saved.id);
       const t = setTimeout(() => setUndoId(null), 5000);
       setUndoTimer(t);
-    } catch {
+    } catch (err) {
       // Rollback optimistic
       setEntries((prev) => prev.filter((e) => e.id !== tempId));
+      console.error("Failed to save water entry:", err);
     } finally {
       setAdding(false);
     }
