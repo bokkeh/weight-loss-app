@@ -20,16 +20,17 @@ export async function GET() {
     let streak = 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split("T")[0];
+    const yesterdayStr = new Date(today.getTime() - 86400000).toISOString().split("T")[0];
 
-    for (let i = 0; i < days.length; i++) {
-      const expected = new Date(today);
-      expected.setDate(expected.getDate() - i);
-      const expectedStr = expected.toISOString().split("T")[0];
-      if (days[i] === expectedStr) {
-        streak++;
-      } else {
-        // Allow streak if first gap is yesterday (started streak yesterday)
-        if (i === 0 && days[0] === new Date(today.getTime() - 86400000).toISOString().split("T")[0]) {
+    if (days.length > 0 && (days[0] === todayStr || days[0] === yesterdayStr)) {
+      // startOffset: 0 if most recent log is today, 1 if yesterday
+      const startOffset = days[0] === todayStr ? 0 : 1;
+      for (let i = 0; i < days.length; i++) {
+        const expected = new Date(today);
+        expected.setDate(expected.getDate() - (i + startOffset));
+        const expectedStr = expected.toISOString().split("T")[0];
+        if (days[i] === expectedStr) {
           streak++;
         } else {
           break;

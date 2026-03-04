@@ -41,7 +41,7 @@ export function WeightTrendChart({ entries, goalWeight }: Props) {
   const maxY = Math.ceil(Math.max(...weights) + 3);
 
   return (
-    <ResponsiveContainer width="100%" height={280}>
+    <ResponsiveContainer width="100%" height={280} style={{ overflow: "visible" }}>
       <LineChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
         <XAxis
@@ -60,7 +60,14 @@ export function WeightTrendChart({ entries, goalWeight }: Props) {
         />
         <Tooltip
           formatter={(value) => [`${value} lbs`, "Weight"]}
-          contentStyle={{ borderRadius: "8px", fontSize: "13px" }}
+          wrapperStyle={{ zIndex: 50 }}
+          contentStyle={{
+            borderRadius: "8px",
+            fontSize: "13px",
+            backgroundColor: "hsl(var(--popover))",
+            borderColor: "hsl(var(--border))",
+            color: "hsl(var(--popover-foreground))",
+          }}
         />
         {goalWeight && (
           <ReferenceLine

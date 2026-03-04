@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Share2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -17,6 +17,16 @@ import { MacroProgressBars } from "@/components/food-log/MacroProgressBars";
 import { QuickLogBar } from "@/components/food-log/QuickLogBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FoodLogEntry, DailyMacroTotals } from "@/types";
+import { shareOrCopy } from "@/lib/shareUtils";
+
+const GOALS = { calories: 2100, protein_g: 180, carbs_g: 170, fat_g: 75, fiber_g: 30 };
+
+const MEAL_EMOJI: Record<string, string> = {
+  breakfast: "🍳",
+  lunch: "🥗",
+  dinner: "🍽️",
+  snack: "🍎",
+};
 
 function toDateStr(d: Date) {
   return d.toISOString().split("T")[0];
@@ -42,11 +52,39 @@ function sumMacros(entries: FoodLogEntry[]): DailyMacroTotals {
   );
 }
 
+function buildShareText(entries: FoodLogEntry[], date: Date): string {
+  const dateLabel = date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const lines: string[] = [`📊 Food Log — ${dateLabel}`, ""];
+
+  const MEAL_ORDER = ["breakfast", "lunch", "dinner", "snack"] as const;
+  for (const meal of MEAL_ORDER) {
+    const items = entries.filter((e) => e.meal_type === meal);
+    if (items.length === 0) continue;
+    lines.push(`${MEAL_EMOJI[meal] ?? "•"} ${meal.charAt(0).toUpperCase() + meal.slice(1)}`);
+    for (const e of items) {
+      const serving = e.serving_size ? ` (${e.serving_size})` : "";
+      lines.push(
+        `• ${e.food_name}${serving} — ${Number(e.calories).toFixed(0)} cal | ${Number(e.protein_g).toFixed(1)}g P | ${Number(e.carbs_g).toFixed(1)}g C | ${Number(e.fat_g).toFixed(1)}g F`
+      );
+    }
+    lines.push("");
+  }
+
+  const totals = sumMacros(entries);
+  lines.push("📈 Daily Totals");
+  lines.push(
+    `Calories: ${totals.calories.toFixed(0)} / ${GOALS.calories} | Protein: ${totals.protein_g.toFixed(1)}g / ${GOALS.protein_g}g | Carbs: ${totals.carbs_g.toFixed(1)}g / ${GOALS.carbs_g}g | Fat: ${totals.fat_g.toFixed(1)}g / ${GOALS.fat_g}g | Fiber: ${totals.fiber_g.toFixed(1)}g / ${GOALS.fiber_g}g`
+  );
+
+  return lines.join("\n");
+}
+
 export default function FoodLogPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [entries, setEntries] = useState<FoodLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [shareLabel, setShareLabel] = useState<"share" | "done">("share");
 
   const today = new Date();
   const isToday = toDateStr(selectedDate) === toDateStr(today);
@@ -74,6 +112,17 @@ export default function FoodLogPage() {
   async function handleDelete(id: number) {
     await fetch(`/api/food-log/${id}`, { method: "DELETE" });
     setEntries((prev) => prev.filter((e) => e.id !== id));
+  }
+
+  function handleUpdated(updated: FoodLogEntry) {
+    setEntries((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+  }
+
+  async function handleShare() {
+    const text = buildShareText(entries, selectedDate);
+    await shareOrCopy(text, "Food Log");
+    setShareLabel("done");
+    setTimeout(() => setShareLabel("share"), 2000);
   }
 
   const totals = sumMacros(entries);
@@ -116,9 +165,7 @@ export default function FoodLogPage() {
           <p className="font-semibold">
             {isToday
               ? "Today"
-              : selectedDate.toLocaleDateString("en-US", {
-                  weekday: "long",
-                })}
+              : selectedDate.toLocaleDateString("en-US", { weekday: "long" })}
           </p>
           <p className="text-sm text-muted-foreground">
             {selectedDate.toLocaleDateString("en-US", {
@@ -160,8 +207,17 @@ export default function FoodLogPage() {
 
         <div className="lg:col-span-2">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Meals</CardTitle>
+              {!loading && entries.length > 0 && (
+                <Button variant="outline" size="sm" onClick={handleShare} className="h-8 gap-1.5">
+                  {shareLabel === "done" ? (
+                    <><Check className="h-3.5 w-3.5 text-green-600" /> Shared!</>
+                  ) : (
+                    <><Share2 className="h-3.5 w-3.5" /> Share Day</>
+                  )}
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {loading ? (
@@ -171,7 +227,11 @@ export default function FoodLogPage() {
                   ))}
                 </div>
               ) : (
-                <FoodLogTable entries={entries} onDelete={handleDelete} />
+                <FoodLogTable
+                  entries={entries}
+                  onDelete={handleDelete}
+                  onUpdated={handleUpdated}
+                />
               )}
             </CardContent>
           </Card>

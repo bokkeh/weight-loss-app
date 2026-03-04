@@ -9,7 +9,8 @@ import { WeeklyCaloriesChart } from "@/components/dashboard/WeeklyCaloriesChart"
 import { MacroDonutChart } from "@/components/dashboard/MacroDonutChart";
 import { DailyQuote } from "@/components/dashboard/DailyQuote";
 import { WeightEntry, FoodLogEntry, DailyMacroTotals } from "@/types";
-import { Scale, Flame, Beef, TrendingDown, Sparkles, Download, Loader2 } from "lucide-react";
+import { Scale, Flame, Beef, TrendingDown, Sparkles, Download, Loader2, Share2, Check } from "lucide-react";
+import { shareOrCopy } from "@/lib/shareUtils";
 
 function sumMacros(entries: FoodLogEntry[]): DailyMacroTotals {
   return entries.reduce(
@@ -77,6 +78,7 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [calorieGoal, setCalorieGoal] = useState(2100);
+  const [shareLabel, setShareLabel] = useState<"share" | "done">("share");
 
   useEffect(() => {
     const saved = localStorage.getItem("calorieGoal");
@@ -138,6 +140,40 @@ export default function DashboardPage() {
     ]);
   }
 
+  async function handleShare() {
+    const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    const latestW = sortedWeight[0];
+    const lines: string[] = [`💪 Health Dashboard — ${dateLabel}`, ""];
+
+    if (latestW) {
+      const wChange = weightChange !== null
+        ? ` (${weightChange > 0 ? "+" : ""}${weightChange.toFixed(1)} lbs since last log)`
+        : "";
+      lines.push(`⚖️ Weight: ${Number(latestW.weight_lbs).toFixed(1)} lbs${wChange}`);
+    }
+    if (streak !== null) {
+      lines.push(`🔥 Streak: ${streak} day${streak !== 1 ? "s" : ""}`);
+    }
+    lines.push("");
+
+    const tod = sumMacros(todayFood);
+    lines.push("Today's Nutrition");
+    lines.push(`• Calories: ${tod.calories.toFixed(0)} / ${calorieGoal} kcal`);
+    lines.push(`• Protein: ${tod.protein_g.toFixed(1)}g / 180g  |  Carbs: ${tod.carbs_g.toFixed(1)}g / 170g  |  Fat: ${tod.fat_g.toFixed(1)}g / 75g`);
+
+    if (weeklyAvgCalories !== null) {
+      lines.push("");
+      lines.push("This Week");
+      lines.push(`• Avg Calories: ${weeklyAvgCalories.toFixed(0)} kcal/day`);
+      const def = calorieGoal - weeklyAvgCalories;
+      lines.push(`• vs Goal: ${def >= 0 ? `${def.toFixed(0)} kcal under` : `${Math.abs(def).toFixed(0)} kcal over`}`);
+    }
+
+    await shareOrCopy(lines.join("\n"), "Health Dashboard");
+    setShareLabel("done");
+    setTimeout(() => setShareLabel("share"), 2000);
+  }
+
   const todayTotals = sumMacros(todayFood);
   const sortedWeight = [...weightEntries].sort((a, b) => b.logged_at.localeCompare(a.logged_at));
   const latestWeight = sortedWeight[0];
@@ -164,10 +200,19 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground text-sm mt-1">Your progress at a glance.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-1.5 shrink-0">
-          <Download className="h-3.5 w-3.5" />
-          Export CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleShare} className="gap-1.5 shrink-0">
+            {shareLabel === "done" ? (
+              <><Check className="h-3.5 w-3.5 text-green-600" /> Shared!</>
+            ) : (
+              <><Share2 className="h-3.5 w-3.5" /> Share</>
+            )}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-1.5 shrink-0">
+            <Download className="h-3.5 w-3.5" />
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       {/* Daily Quote */}

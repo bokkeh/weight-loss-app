@@ -37,12 +37,16 @@ export function WeeklyCaloriesChart({ entries, calorieGoal = 2000 }: Props) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={200}>
+    <ResponsiveContainer width="100%" height={200} style={{ overflow: "visible" }}>
       <BarChart data={data} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
         <XAxis dataKey="date" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
         <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
-        <Tooltip formatter={(v) => [`${v} kcal`, "Calories"]} contentStyle={{ borderRadius: "8px", fontSize: "12px" }} />
+        <Tooltip
+          formatter={(v) => [`${v} kcal`, "Calories"]}
+          wrapperStyle={{ zIndex: 50 }}
+          contentStyle={{ borderRadius: "8px", fontSize: "12px", backgroundColor: "hsl(var(--popover))", borderColor: "hsl(var(--border))", color: "hsl(var(--popover-foreground))" }}
+        />
         <ReferenceLine y={calorieGoal} stroke="#f59e0b" strokeDasharray="4 4" />
         <Bar dataKey="calories" fill="#f97316" radius={[3, 3, 0, 0]} />
       </BarChart>

@@ -38,7 +38,11 @@ export function MacroDonutChart({ totals }: Props) {
             <Cell key={index} fill={entry.fill} />
           ))}
         </Pie>
-        <Tooltip formatter={(v) => [`${v} kcal`]} contentStyle={{ borderRadius: "8px", fontSize: "12px" }} />
+        <Tooltip
+          formatter={(v) => [`${v} kcal`]}
+          wrapperStyle={{ zIndex: 50 }}
+          contentStyle={{ borderRadius: "8px", fontSize: "12px", backgroundColor: "hsl(var(--popover))", borderColor: "hsl(var(--border))", color: "hsl(var(--popover-foreground))" }}
+        />
         <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "12px" }} />
       </PieChart>
     </ResponsiveContainer>
