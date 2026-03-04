@@ -208,7 +208,7 @@ export default function ChatPage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask about nutrition or log what you ate..."
+                placeholder="How can I help?"
                 className="resize-none min-h-[44px] max-h-32 border-0 shadow-none focus-visible:ring-0 bg-transparent"
                 rows={1}
                 disabled={sending}
