@@ -33,8 +33,7 @@ export function WaterWidget({ sodiumMgToday, hasFoodLogged }: WaterWidgetProps) 
   const [entries, setEntries] = useState<WaterLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
-  const [undoId, setUndoId] = useState<number | null>(null);
-  const [undoTimer, setUndoTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const today = localDateStr();
 
@@ -49,13 +48,6 @@ export function WaterWidget({ sodiumMgToday, hasFoodLogged }: WaterWidgetProps) 
     load();
   }, [load]);
 
-  // Clear undo timer on unmount
-  useEffect(() => {
-    return () => {
-      if (undoTimer) clearTimeout(undoTimer);
-    };
-  }, [undoTimer]);
-
   const consumedOz = entries.reduce((sum, e) => sum + Number(e.ounces), 0);
   const recommended = calcRecommended(sodiumMgToday);
   const pct = Math.min(1, consumedOz / recommended);
@@ -66,7 +58,6 @@ export function WaterWidget({ sodiumMgToday, hasFoodLogged }: WaterWidgetProps) 
     if (adding) return;
     setAdding(true);
 
-    // Optimistic: add a fake entry
     const tempId = Date.now() * -1;
     const optimistic: WaterLogEntry = {
       id: tempId,
@@ -85,17 +76,8 @@ export function WaterWidget({ sodiumMgToday, hasFoodLogged }: WaterWidgetProps) 
       });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const saved: WaterLogEntry = await res.json();
-
-      // Replace optimistic with real
       setEntries((prev) => prev.map((e) => (e.id === tempId ? saved : e)));
-
-      // Show undo for 5 seconds
-      if (undoTimer) clearTimeout(undoTimer);
-      setUndoId(saved.id);
-      const t = setTimeout(() => setUndoId(null), 5000);
-      setUndoTimer(t);
     } catch (err) {
-      // Rollback optimistic
       setEntries((prev) => prev.filter((e) => e.id !== tempId));
       console.error("Failed to save water entry:", err);
     } finally {
@@ -103,18 +85,25 @@ export function WaterWidget({ sodiumMgToday, hasFoodLogged }: WaterWidgetProps) 
     }
   }
 
-  async function handleUndo() {
-    if (!undoId) return;
-    if (undoTimer) clearTimeout(undoTimer);
-    setUndoId(null);
+  async function handleRemoveLast() {
+    if (removing || entries.length === 0) return;
+    // Last entry in the sorted list (most recently added)
+    const last = entries[entries.length - 1];
+    setRemoving(true);
 
     // Optimistic remove
-    setEntries((prev) => prev.filter((e) => e.id !== undoId));
+    setEntries((prev) => prev.filter((e) => e.id !== last.id));
 
-    await fetch(`/api/water?id=${undoId}`, { method: "DELETE" }).catch(() => {
-      // If it fails, reload from server
+    try {
+      const res = await fetch(`/api/water?id=${last.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+    } catch (err) {
+      // Rollback: reload from server
+      console.error("Failed to remove water entry:", err);
       load();
-    });
+    } finally {
+      setRemoving(false);
+    }
   }
 
   const progressColor =
@@ -173,6 +162,18 @@ export function WaterWidget({ sodiumMgToday, hasFoodLogged }: WaterWidgetProps) 
 
             {/* Buttons */}
             <div className="flex gap-2 items-center">
+              {entries.length > 0 && (
+                <Button
+                  onClick={handleRemoveLast}
+                  disabled={removing}
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  aria-label="Remove last glass"
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 onClick={handleAdd}
                 disabled={adding}
@@ -182,17 +183,6 @@ export function WaterWidget({ sodiumMgToday, hasFoodLogged }: WaterWidgetProps) 
                 <Plus className="h-4 w-4" />
                 Add Glass (8 oz)
               </Button>
-              {undoId !== null && (
-                <Button
-                  onClick={handleUndo}
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                >
-                  <Minus className="h-4 w-4" />
-                  Undo
-                </Button>
-              )}
             </div>
 
             {pct >= 1 && (
