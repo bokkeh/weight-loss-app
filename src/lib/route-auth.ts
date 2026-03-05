@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { getToken } from "next-auth/jwt";
 import { authOptions } from "@/lib/auth-options";
 import { ensureMultiUserSchema } from "@/lib/auth-user";
 import { getOrCreateUserId } from "@/lib/auth-user";
 import { findUserIdByEmail } from "@/lib/auth-user";
 import { isAdminEmail } from "@/lib/admin";
 
-export async function requireUserId(_req?: Request) {
-  void _req;
+export async function requireUserId(req?: Request) {
   try {
     await ensureMultiUserSchema();
   } catch (error) {
@@ -16,6 +16,31 @@ export async function requireUserId(_req?: Request) {
   }
 
   try {
+    // First try cookie token resolution in route handlers.
+    if (req) {
+      try {
+        const cookie = req.headers.get("cookie") ?? "";
+        const token = await getToken({
+          req: { headers: { cookie } } as unknown as import("next-auth/jwt").GetTokenParams["req"],
+          secret: process.env.NEXTAUTH_SECRET,
+        });
+        if (token?.userId) {
+          const parsedId = Number(token.userId);
+          if (Number.isFinite(parsedId) && parsedId > 0) {
+            return { userId: parsedId };
+          }
+        }
+        if (token?.email) {
+          const existingUserId = await findUserIdByEmail(String(token.email));
+          if (existingUserId) {
+            return { userId: existingUserId };
+          }
+        }
+      } catch (error) {
+        console.error("token auth resolution failed:", error);
+      }
+    }
+
     const session = await getServerSession(authOptions);
     const rawId = session?.user?.id;
     const parsedId = Number(rawId);
