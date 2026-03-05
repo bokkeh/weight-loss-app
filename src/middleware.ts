@@ -15,5 +15,6 @@ export const config = {
     "/chat/:path*",
     "/recipes/:path*",
     "/profile/:path*",
+    "/admin/:path*",
   ],
 };

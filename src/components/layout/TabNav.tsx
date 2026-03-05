@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +23,7 @@ import {
   Menu,
   Download,
   LogOut,
+  Shield,
 } from "lucide-react";
 import { FoodLogEntry, WeightEntry } from "@/types";
 
@@ -43,11 +44,13 @@ const desktopTabs = [
 
 export function TabNav() {
   const pathname = usePathname();
+  const { data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
   if (pathname.startsWith("/signin")) {
     return null;
   }
   const closeMenu = () => setMenuOpen(false);
+  const isAdmin = session?.user?.email?.toLowerCase() === "alexterry12@gmail.com";
 
   function downloadCSV(filename: string, rows: string[][]) {
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -89,6 +92,14 @@ export function TabNav() {
     await signOut({ callbackUrl: "/signin" });
   }
 
+  const desktopNavItems = isAdmin
+    ? [...desktopTabs, { href: "/admin", label: "Admin", icon: Shield }]
+    : desktopTabs;
+
+  const mobileNavItems = isAdmin
+    ? [...tabs, profileTab, { href: "/admin", label: "Admin", icon: Shield }]
+    : [...tabs, profileTab];
+
   return (
     <>
       {/* Desktop: left sidebar */}
@@ -97,7 +108,7 @@ export function TabNav() {
           <span className="text-lg font-bold text-primary">WeightTrack</span>
         </div>
         <div className="flex flex-col gap-1 p-3 flex-1">
-          {desktopTabs.map(({ href, label, icon: Icon }) => {
+          {desktopNavItems.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
             return (
               <Link
@@ -147,7 +158,7 @@ export function TabNav() {
                 <SheetTitle>Menu</SheetTitle>
               </SheetHeader>
               <div className="mt-4 px-4 pb-4 flex flex-col gap-1">
-                {[...tabs, profileTab].map(({ href, label, icon: Icon }) => {
+                {mobileNavItems.map(({ href, label, icon: Icon }) => {
                   const active = pathname === href || pathname.startsWith(href + "/");
                   return (
                     <Link
