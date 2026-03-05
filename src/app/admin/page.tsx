@@ -28,11 +28,20 @@ interface DailyRow {
 interface GlobalTotals {
   users: number;
   profiles: number;
+  historical_accounts: number;
   weight_entries: number;
   food_logs: number;
   water_logs: number;
   recipes: number;
   chat_messages: number;
+}
+
+interface HistoricalAccountRow {
+  email: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  login_count: number;
+  providers: string[];
 }
 
 export default async function AdminPage() {
@@ -165,12 +174,30 @@ export default async function AdminPage() {
     SELECT
       (SELECT COUNT(*) FROM all_user_ids)::int AS users,
       (SELECT COUNT(*) FROM user_profiles)::int AS profiles,
+      (
+        SELECT COUNT(DISTINCT LOWER(email))::int
+        FROM auth_login_events
+        WHERE email IS NOT NULL AND TRIM(email) <> ''
+      ) AS historical_accounts,
       (SELECT COUNT(*) FROM weight_entries)::int AS weight_entries,
       (SELECT COUNT(*) FROM food_log_entries)::int AS food_logs,
       (SELECT COUNT(*) FROM water_log_entries)::int AS water_logs,
       (SELECT COUNT(*) FROM recipes)::int AS recipes,
       (SELECT COUNT(*) FROM chat_messages)::int AS chat_messages
   `) as GlobalTotals[];
+
+  const historicalAccounts = (await sql`
+    SELECT
+      LOWER(email) AS email,
+      MIN(logged_in_at)::text AS first_seen_at,
+      MAX(logged_in_at)::text AS last_seen_at,
+      COUNT(*)::int AS login_count,
+      ARRAY_REMOVE(ARRAY_AGG(DISTINCT provider), NULL)::text[] AS providers
+    FROM auth_login_events
+    WHERE email IS NOT NULL AND TRIM(email) <> ''
+    GROUP BY LOWER(email)
+    ORDER BY MAX(logged_in_at) DESC
+  `) as HistoricalAccountRow[];
 
   return (
     <div className="space-y-6">
@@ -184,6 +211,7 @@ export default async function AdminPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Users</p><p className="font-semibold">{totals?.users ?? 0}</p></div>
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Profiles</p><p className="font-semibold">{totals?.profiles ?? 0}</p></div>
+          <div className="rounded-lg border p-3"><p className="text-muted-foreground">Historical Accounts</p><p className="font-semibold">{totals?.historical_accounts ?? 0}</p></div>
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Weight Logs</p><p className="font-semibold">{totals?.weight_entries ?? 0}</p></div>
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Food Logs</p><p className="font-semibold">{totals?.food_logs ?? 0}</p></div>
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Water Logs</p><p className="font-semibold">{totals?.water_logs ?? 0}</p></div>
@@ -250,6 +278,31 @@ export default async function AdminPage() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="rounded-xl border bg-card p-4">
+        <h2 className="font-semibold mb-3">Historical Accounts (All-Time)</h2>
+        <div className="space-y-2">
+          {historicalAccounts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No historical login accounts found yet.</p>
+          ) : (
+            historicalAccounts.map((row) => (
+              <div key={row.email} className="flex items-center justify-between text-sm border rounded-lg p-3 gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{row.email}</p>
+                  <p className="text-xs text-muted-foreground">
+                    First seen: {new Date(row.first_seen_at).toLocaleString()}
+                  </p>
+                </div>
+                <div className="text-right text-xs text-muted-foreground shrink-0">
+                  <p>Last login: <span className="font-medium text-foreground">{new Date(row.last_seen_at).toLocaleString()}</span></p>
+                  <p>Logins: <span className="font-medium text-foreground">{row.login_count}</span></p>
+                  <p>Providers: <span className="font-medium text-foreground">{row.providers.length > 0 ? row.providers.join(", ") : "unknown"}</span></p>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
