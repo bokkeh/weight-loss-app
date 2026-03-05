@@ -59,15 +59,15 @@ function greetingByHour(hour: number): "Good morning" | "Good afternoon" | "Good
   return "Good evening";
 }
 
-function weatherMeta(code: number): { label: string; emoji: string } {
-  if (code === 0) return { label: "Clear", emoji: "â˜€ï¸" };
-  if ([1, 2].includes(code)) return { label: "Partly Cloudy", emoji: "â›…" };
-  if (code === 3) return { label: "Cloudy", emoji: "â˜ï¸" };
-  if ([45, 48].includes(code)) return { label: "Foggy", emoji: "ðŸŒ«ï¸" };
-  if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return { label: "Rainy", emoji: "ðŸŒ§ï¸" };
-  if ([71, 73, 75, 85, 86].includes(code)) return { label: "Snowy", emoji: "â„ï¸" };
-  if ([95, 96, 99].includes(code)) return { label: "Stormy", emoji: "â›ˆï¸" };
-  return { label: "Mild", emoji: "ðŸŒ¤ï¸" };
+function weatherMeta(code: number): { label: string; icon: string } {
+  if (code === 0) return { label: "Clear", icon: "wb_sunny" };
+  if ([1, 2].includes(code)) return { label: "Partly Cloudy", icon: "partly_cloudy_day" };
+  if (code === 3) return { label: "Cloudy", icon: "cloud" };
+  if ([45, 48].includes(code)) return { label: "Foggy", icon: "foggy" };
+  if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return { label: "Rainy", icon: "rainy" };
+  if ([71, 73, 75, 85, 86].includes(code)) return { label: "Snowy", icon: "weather_snowy" };
+  if ([95, 96, 99].includes(code)) return { label: "Stormy", icon: "thunderstorm" };
+  return { label: "Mild", icon: "partly_cloudy_day" };
 }
 
 function downloadCSV(filename: string, rows: string[][]) {
@@ -311,7 +311,9 @@ export default function DashboardPage() {
         <div className="flex flex-col items-end gap-2">
           {weatherInfo && weather && (
             <div className="text-right shrink-0 mt-1">
-              <p className="text-3xl leading-none">{weatherInfo.emoji}</p>
+              <span className="material-symbols-outlined text-[44px] leading-none text-slate-700">
+                {weatherInfo.icon}
+              </span>
               <p className="text-4xl font-semibold leading-tight mt-1">{Math.round(weather.tempF)}°F</p>
               <p className="text-sm text-muted-foreground">{weatherInfo.label}</p>
             </div>
