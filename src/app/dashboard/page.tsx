@@ -4,13 +4,38 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { WeeklyWeightChart } from "@/components/dashboard/WeeklyWeightChart";
 import { WeeklyCaloriesChart } from "@/components/dashboard/WeeklyCaloriesChart";
 import { MacroDonutChart } from "@/components/dashboard/MacroDonutChart";
 import { DailyQuote } from "@/components/dashboard/DailyQuote";
 import { WaterWidget } from "@/components/dashboard/WaterWidget";
 import { WeightEntry, FoodLogEntry, DailyMacroTotals } from "@/types";
-import { Scale, Flame, Beef, TrendingDown, Sparkles, Download, Loader2, Share2, Check } from "lucide-react";
+import {
+  Scale,
+  Flame,
+  Beef,
+  TrendingDown,
+  Sparkles,
+  Download,
+  Loader2,
+  Share2,
+  Check,
+  Menu,
+  Sun,
+  CloudSun,
+  Cloud,
+  CloudFog,
+  CloudRain,
+  CloudSnow,
+  CloudLightning,
+} from "lucide-react";
 import { shareOrCopy } from "@/lib/shareUtils";
 import { localDateStr } from "@/lib/utils";
 
@@ -59,15 +84,15 @@ function greetingByHour(hour: number): "Good morning" | "Good afternoon" | "Good
   return "Good evening";
 }
 
-function weatherMeta(code: number): { label: string; icon: string } {
-  if (code === 0) return { label: "Clear", icon: "wb_sunny" };
-  if ([1, 2].includes(code)) return { label: "Partly Cloudy", icon: "partly_cloudy_day" };
-  if (code === 3) return { label: "Cloudy", icon: "cloud" };
-  if ([45, 48].includes(code)) return { label: "Foggy", icon: "foggy" };
-  if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return { label: "Rainy", icon: "rainy" };
-  if ([71, 73, 75, 85, 86].includes(code)) return { label: "Snowy", icon: "weather_snowy" };
-  if ([95, 96, 99].includes(code)) return { label: "Stormy", icon: "thunderstorm" };
-  return { label: "Mild", icon: "partly_cloudy_day" };
+function weatherMeta(code: number): { label: string; Icon: React.ComponentType<{ className?: string }> } {
+  if (code === 0) return { label: "Clear", Icon: Sun };
+  if ([1, 2].includes(code)) return { label: "Partly Cloudy", Icon: CloudSun };
+  if (code === 3) return { label: "Cloudy", Icon: Cloud };
+  if ([45, 48].includes(code)) return { label: "Foggy", Icon: CloudFog };
+  if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return { label: "Rainy", Icon: CloudRain };
+  if ([71, 73, 75, 85, 86].includes(code)) return { label: "Snowy", Icon: CloudSnow };
+  if ([95, 96, 99].includes(code)) return { label: "Stormy", Icon: CloudLightning };
+  return { label: "Mild", Icon: CloudSun };
 }
 
 function downloadCSV(filename: string, rows: string[][]) {
@@ -116,6 +141,7 @@ export default function DashboardPage() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [calorieGoal, setCalorieGoal] = useState(2100);
   const [shareLabel, setShareLabel] = useState<"share" | "done">("share");
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [gutTipIndex, setGutTipIndex] = useState(0);
   const [firstName, setFirstName] = useState("there");
   const [profileImageUrl, setProfileImageUrl] = useState("");
@@ -228,30 +254,30 @@ export default function DashboardPage() {
   async function handleShare() {
     const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
     const latestW = sortedWeight[0];
-    const lines: string[] = [`ðŸ’ª Health Dashboard â€” ${dateLabel}`, ""];
+    const lines: string[] = [`Health Dashboard - ${dateLabel}`, ""];
 
     if (latestW) {
       const wChange = weightChange !== null
         ? ` (${weightChange > 0 ? "+" : ""}${weightChange.toFixed(1)} lbs since last log)`
         : "";
-      lines.push(`âš–ï¸ Weight: ${Number(latestW.weight_lbs).toFixed(1)} lbs${wChange}`);
+      lines.push(`Weight: ${Number(latestW.weight_lbs).toFixed(1)} lbs${wChange}`);
     }
     if (streak !== null) {
-      lines.push(`ðŸ”¥ Streak: ${streak} day${streak !== 1 ? "s" : ""}`);
+      lines.push(`Streak: ${streak} day${streak !== 1 ? "s" : ""}`);
     }
     lines.push("");
 
     const tod = sumMacros(todayFood);
     lines.push("Today's Nutrition");
-    lines.push(`â€¢ Calories: ${tod.calories.toFixed(0)} / ${calorieGoal} kcal`);
-    lines.push(`â€¢ Protein: ${tod.protein_g.toFixed(1)}g / 180g  |  Carbs: ${tod.carbs_g.toFixed(1)}g / 170g  |  Fat: ${tod.fat_g.toFixed(1)}g / 75g`);
+    lines.push(`- Calories: ${tod.calories.toFixed(0)} / ${calorieGoal} kcal`);
+    lines.push(`- Protein: ${tod.protein_g.toFixed(1)}g / 180g  |  Carbs: ${tod.carbs_g.toFixed(1)}g / 170g  |  Fat: ${tod.fat_g.toFixed(1)}g / 75g`);
 
     if (weeklyAvgCalories !== null) {
       lines.push("");
       lines.push("This Week");
-      lines.push(`â€¢ Avg Calories: ${weeklyAvgCalories.toFixed(0)} kcal/day`);
+      lines.push(`- Avg Calories: ${weeklyAvgCalories.toFixed(0)} kcal/day`);
       const def = calorieGoal - weeklyAvgCalories;
-      lines.push(`â€¢ vs Goal: ${def >= 0 ? `${def.toFixed(0)} kcal under` : `${Math.abs(def).toFixed(0)} kcal over`}`);
+      lines.push(`- vs Goal: ${def >= 0 ? `${def.toFixed(0)} kcal under` : `${Math.abs(def).toFixed(0)} kcal over`}`);
     }
 
     await shareOrCopy(lines.join("\n"), "Health Dashboard");
@@ -278,6 +304,7 @@ export default function DashboardPage() {
   const weeklyDeficit = weeklyAvgCalories !== null ? calorieGoal - weeklyAvgCalories : null;
   const greeting = `${greetingByHour(new Date().getHours())}, ${firstName}`;
   const weatherInfo = weather ? weatherMeta(weather.code) : null;
+  const WeatherIcon = weatherInfo?.Icon;
 
   return (
     <div className="space-y-6">
@@ -301,19 +328,38 @@ export default function DashboardPage() {
                   <><Share2 className="h-3.5 w-3.5" /> Share</>
                 )}
               </Button>
-              <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-1.5 shrink-0">
-                <Download className="h-3.5 w-3.5" />
-                Export CSV
-              </Button>
+              <Sheet open={actionsOpen} onOpenChange={setActionsOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" aria-label="Open actions menu">
+                    <Menu className="h-4 w-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-72">
+                  <SheetHeader>
+                    <SheetTitle>Dashboard Menu</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-4 flex flex-col gap-2">
+                    <Button
+                      variant="outline"
+                      className="justify-start gap-2"
+                      onClick={async () => {
+                        await handleExportCSV();
+                        setActionsOpen(false);
+                      }}
+                    >
+                      <Download className="h-4 w-4" />
+                      Export CSV
+                    </Button>
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           </div>
         </div>
         <div className="flex flex-col items-end gap-2">
-          {weatherInfo && weather && (
+          {weatherInfo && weather && WeatherIcon && (
             <div className="text-right shrink-0 mt-1">
-              <span className="material-symbols-outlined text-[44px] leading-none text-slate-700">
-                {weatherInfo.icon}
-              </span>
+              <WeatherIcon className="h-10 w-10 ml-auto text-slate-700" />
               <p className="text-4xl font-semibold leading-tight mt-1">{Math.round(weather.tempF)}°F</p>
               <p className="text-sm text-muted-foreground">{weatherInfo.label}</p>
             </div>
@@ -333,7 +379,7 @@ export default function DashboardPage() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             title="Current Weight"
-            value={latestWeight ? `${Number(latestWeight.weight_lbs).toFixed(1)} lbs` : "â€”"}
+            value={latestWeight ? `${Number(latestWeight.weight_lbs).toFixed(1)} lbs` : "-"}
             subtitle={latestWeight
               ? new Date(latestWeight.logged_at + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
               : "No entries yet"}
@@ -342,7 +388,7 @@ export default function DashboardPage() {
           />
           <StatCard
             title="Since Last Log"
-            value={weightChange !== null ? `${weightChange > 0 ? "+" : ""}${weightChange.toFixed(1)} lbs` : "â€”"}
+            value={weightChange !== null ? `${weightChange > 0 ? "+" : ""}${weightChange.toFixed(1)} lbs` : "-"}
             subtitle={weightChange !== null
               ? weightChange < 0 ? "Keep it up!" : weightChange > 0 ? "Slight increase" : "No change"
               : "Log more entries"}
@@ -371,8 +417,8 @@ export default function DashboardPage() {
         <div className="grid sm:grid-cols-2 gap-4">
           <StatCard
             title="Logging Streak"
-            value={streak !== null ? `${streak} day${streak !== 1 ? "s" : ""}` : "â€”"}
-            subtitle={streak ? (streak >= 7 ? "Amazing consistency! ðŸ”¥" : "Keep going!") : "Log today to start"}
+            value={streak !== null ? `${streak} day${streak !== 1 ? "s" : ""}` : "-"}
+            subtitle={streak ? (streak >= 7 ? "Amazing consistency!" : "Keep going!") : "Log today to start"}
             icon={<Flame className="h-5 w-5 text-amber-500" />}
             color="bg-amber-50 dark:bg-amber-950"
           />
@@ -380,7 +426,7 @@ export default function DashboardPage() {
             title="Weekly Avg Deficit"
             value={weeklyDeficit !== null
               ? `${weeklyDeficit >= 0 ? "-" : "+"}${Math.abs(weeklyDeficit).toFixed(0)} kcal/day`
-              : "â€”"}
+              : "-"}
             subtitle={weeklyAvgCalories !== null
               ? `Avg ${weeklyAvgCalories.toFixed(0)} kcal/day vs ${calorieGoal} goal`
               : "No food logged this week"}
@@ -416,7 +462,7 @@ export default function DashboardPage() {
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Weight â€” Last 4 Weeks</CardTitle>
+            <CardTitle className="text-base">Weight - Last 4 Weeks</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? <Skeleton className="h-48 w-full" /> : <WeeklyWeightChart entries={weeklyWeightEntries} />}
@@ -424,7 +470,7 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Calories â€” Last 7 Days</CardTitle>
+            <CardTitle className="text-base">Calories - Last 7 Days</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? <Skeleton className="h-48 w-full" /> : <WeeklyCaloriesChart entries={foodEntries} />}
