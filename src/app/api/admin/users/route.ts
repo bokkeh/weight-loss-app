@@ -8,18 +8,38 @@ export async function GET() {
 
   try {
     const users = await sql`
+      WITH all_user_ids AS (
+        SELECT id AS user_id FROM user_profiles
+        UNION
+        SELECT user_id FROM auth_accounts
+        UNION
+        SELECT user_id FROM auth_login_events
+      ),
+      profile_agg AS (
+        SELECT id AS user_id, first_name, last_name, email, profile_image_url, created_at
+        FROM user_profiles
+      ),
+      login_agg AS (
+        SELECT
+          user_id,
+          MAX(logged_in_at) AS last_login_at,
+          COUNT(*) FILTER (WHERE logged_in_at::date = CURRENT_DATE)::int AS logins_today,
+          MAX(email) FILTER (WHERE email IS NOT NULL AND TRIM(email) <> '') AS last_login_email
+        FROM auth_login_events
+        GROUP BY user_id
+      )
       SELECT
-        up.id,
-        up.first_name,
-        up.last_name,
-        up.email,
-        up.profile_image_url,
-        MAX(le.logged_in_at)::text AS last_login_at,
-        COUNT(*) FILTER (WHERE le.logged_in_at::date = CURRENT_DATE)::int AS logins_today
-      FROM user_profiles up
-      LEFT JOIN auth_login_events le ON le.user_id = up.id
-      GROUP BY up.id, up.first_name, up.last_name, up.email, up.profile_image_url
-      ORDER BY MAX(le.logged_in_at) DESC NULLS LAST, up.created_at DESC
+        au.user_id::int AS id,
+        pa.first_name,
+        pa.last_name,
+        COALESCE(pa.email, la.last_login_email) AS email,
+        pa.profile_image_url,
+        la.last_login_at::text AS last_login_at,
+        COALESCE(la.logins_today, 0)::int AS logins_today
+      FROM all_user_ids au
+      LEFT JOIN profile_agg pa ON pa.user_id = au.user_id
+      LEFT JOIN login_agg la ON la.user_id = au.user_id
+      ORDER BY la.last_login_at DESC NULLS LAST, pa.created_at DESC NULLS LAST, au.user_id DESC
     `;
 
     const daily = await sql`

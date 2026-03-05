@@ -45,6 +45,8 @@ export default async function AdminPage() {
     WITH all_user_ids AS (
       SELECT id AS user_id FROM user_profiles
       UNION
+      SELECT user_id FROM auth_accounts
+      UNION
       SELECT user_id FROM weight_entries
       UNION
       SELECT user_id FROM food_log_entries
@@ -61,7 +63,8 @@ export default async function AdminPage() {
       SELECT
         user_id,
         MAX(logged_in_at) AS last_login_at,
-        COUNT(*) FILTER (WHERE logged_in_at::date = CURRENT_DATE)::int AS logins_today
+        COUNT(*) FILTER (WHERE logged_in_at::date = CURRENT_DATE)::int AS logins_today,
+        MAX(email) FILTER (WHERE email IS NOT NULL AND TRIM(email) <> '') AS last_login_email
       FROM auth_login_events
       GROUP BY user_id
     ),
@@ -94,7 +97,7 @@ export default async function AdminPage() {
       au.user_id::int AS id,
       up.first_name,
       up.last_name,
-      up.email,
+      COALESCE(up.email, la.last_login_email) AS email,
       up.profile_image_url,
       la.last_login_at::text,
       GREATEST(
@@ -144,6 +147,8 @@ export default async function AdminPage() {
   const [totals] = (await sql`
     WITH all_user_ids AS (
       SELECT id AS user_id FROM user_profiles
+      UNION
+      SELECT user_id FROM auth_accounts
       UNION
       SELECT user_id FROM weight_entries
       UNION
