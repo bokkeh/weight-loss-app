@@ -80,9 +80,63 @@ function buildShareText(entries: FoodLogEntry[], date: Date): string {
   return lines.join("\n");
 }
 
+function targetMealForHour(hour: number): "breakfast" | "lunch" | "dinner" | "snack" {
+  if (hour < 10) return "breakfast";
+  if (hour < 15) return "lunch";
+  if (hour < 21) return "dinner";
+  return "snack";
+}
+
+function isHealthyForMeal(entry: FoodLogEntry, meal: "breakfast" | "lunch" | "dinner" | "snack"): boolean {
+  const calories = Number(entry.calories);
+  const protein = Number(entry.protein_g);
+  const sodium = Number(entry.sodium_mg);
+
+  if (meal === "snack") {
+    return calories >= 100 && calories <= 350 && protein >= 8 && sodium <= 450;
+  }
+  return calories >= 250 && calories <= 750 && protein >= 20 && sodium <= 900;
+}
+
+function buildMealRecommendation(recentEntries: FoodLogEntry[]): string {
+  const hour = new Date().getHours();
+  const targetMeal = targetMealForHour(hour);
+  const displayMeal = targetMeal.charAt(0).toUpperCase() + targetMeal.slice(1);
+
+  const sorted = [...recentEntries].sort((a, b) => {
+    const dateCmp = b.logged_at.localeCompare(a.logged_at);
+    if (dateCmp !== 0) return dateCmp;
+    return b.created_at.localeCompare(a.created_at);
+  });
+
+  const matchingHealthy = sorted.find(
+    (e) => e.meal_type === targetMeal && isHealthyForMeal(e, targetMeal)
+  );
+  const fallbackHealthy = sorted.find(
+    (e) => (e.meal_type === targetMeal || e.meal_type === "snack") && isHealthyForMeal(e, targetMeal)
+  );
+  const pick = matchingHealthy ?? fallbackHealthy;
+
+  if (pick) {
+    return `It's almost time for ${displayMeal.toLowerCase()}. If you have any ${pick.food_name.toLowerCase()} left, that's a strong repeat.`;
+  }
+
+  if (targetMeal === "breakfast") {
+    return "It's almost time for breakfast. Go with eggs or yogurt to start high-protein and steady.";
+  }
+  if (targetMeal === "lunch") {
+    return "What's for lunch? Build around a lean protein + fiber carbs so your afternoon energy stays stable.";
+  }
+  if (targetMeal === "dinner") {
+    return "Dinner idea: keep protein high, pair with veggies, and keep sodium moderate so tomorrow's weigh-in is cleaner.";
+  }
+  return "Late-night snack? Keep it light and protein-forward so you don't overshoot calories.";
+}
+
 export default function FoodLogPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [entries, setEntries] = useState<FoodLogEntry[]>([]);
+  const [recentEntries, setRecentEntries] = useState<FoodLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [shareLabel, setShareLabel] = useState<"share" | "done">("share");
@@ -93,9 +147,13 @@ export default function FoodLogPage() {
   const fetchEntries = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/food-log?date=${toDateStr(selectedDate)}`);
-      const data = await res.json();
-      setEntries(data);
+      const [dayRes, recentRes] = await Promise.all([
+        fetch(`/api/food-log?date=${toDateStr(selectedDate)}`),
+        fetch("/api/food-log?weeks=6"),
+      ]);
+      const [dayData, recentData] = await Promise.all([dayRes.json(), recentRes.json()]);
+      setEntries(Array.isArray(dayData) ? dayData : []);
+      setRecentEntries(Array.isArray(recentData) ? recentData : []);
     } finally {
       setLoading(false);
     }
@@ -127,6 +185,7 @@ export default function FoodLogPage() {
   }
 
   const totals = sumMacros(entries);
+  const mealRecommendation = buildMealRecommendation(recentEntries);
 
   return (
     <div className="space-y-6">
@@ -188,6 +247,18 @@ export default function FoodLogPage() {
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Next Meal Idea</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-10 w-full" />
+              ) : (
+                <p className="text-sm text-muted-foreground leading-relaxed">{mealRecommendation}</p>
+              )}
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle>Daily Goals</CardTitle>

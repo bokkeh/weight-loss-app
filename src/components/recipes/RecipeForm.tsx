@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { X } from "lucide-react";
+import { X, Sparkles, Loader2 } from "lucide-react";
 import { Recipe } from "@/types";
 
 interface Props {
@@ -42,6 +42,7 @@ export function RecipeForm({ initial, onSaved, onCancel }: Props) {
   );
 
   const [loading, setLoading] = useState(false);
+  const [generatingImage, setGeneratingImage] = useState(false);
   const [error, setError] = useState("");
 
   function setField(key: keyof typeof form, value: string) {
@@ -83,6 +84,43 @@ export function RecipeForm({ initial, onSaved, onCancel }: Props) {
     } else {
       setImageFile(null);
       setImagePreview(imageUrlInput || null);
+    }
+  }
+
+  async function handleGenerateImage() {
+    setGeneratingImage(true);
+    setError("");
+    try {
+      const res = await fetch("/api/recipes/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          description: form.description,
+          ingredients: form.ingredients,
+          instructions: form.instructions,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? `Image generation failed (${res.status})`);
+      if (!data.imageDataUrl || typeof data.imageDataUrl !== "string") {
+        throw new Error("Image generation failed: no image returned.");
+      }
+
+      const blob = await fetch(data.imageDataUrl).then((r) => r.blob());
+      const ext = blob.type.includes("jpeg") ? "jpg" : "png";
+      const generatedFile = new File([blob], `recipe-generated-${Date.now()}.${ext}`, {
+        type: blob.type || "image/png",
+      });
+
+      setImageMode("file");
+      setImageFile(generatedFile);
+      setImageUrlInput("");
+      setImagePreview(data.imageDataUrl);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setGeneratingImage(false);
     }
   }
 
@@ -340,6 +378,28 @@ export function RecipeForm({ initial, onSaved, onCancel }: Props) {
             value={imageUrlInput}
             onChange={(e) => handleUrlChange(e.target.value)}
           />
+        )}
+
+        {!imagePreview && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleGenerateImage}
+            disabled={generatingImage || (!form.ingredients.trim() && !form.name.trim())}
+            className="w-full gap-2"
+          >
+            {generatingImage ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Generating image...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" />
+                Generate with AI from ingredients
+              </>
+            )}
+          </Button>
         )}
 
         {imagePreview && (

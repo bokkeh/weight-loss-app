@@ -19,14 +19,26 @@ interface Props {
 
 export function WeightTrendChart({ entries, goalWeight }: Props) {
   const data = [...entries]
-    .sort((a, b) => a.logged_at.localeCompare(b.logged_at))
-    .map((e) => ({
-      date: new Date(e.logged_at + "T12:00:00").toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      }),
-      weight: Number(e.weight_lbs),
-    }));
+    .filter((e) => Number.isFinite(Number(e.weight_lbs)))
+    .sort((a, b) => {
+      const dateCmp = a.logged_at.localeCompare(b.logged_at);
+      if (dateCmp !== 0) return dateCmp;
+      const rank = (v: WeightEntry["time_of_day"]) =>
+        v === "morning" ? 0 : v === "evening" ? 1 : 2;
+      return rank(a.time_of_day) - rank(b.time_of_day);
+    })
+    .map((e) => {
+      const dateOnly = String(e.logged_at).slice(0, 10);
+      const parsed = new Date(`${dateOnly}T12:00:00`);
+      const label = Number.isNaN(parsed.getTime())
+        ? dateOnly
+        : parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const slot = e.time_of_day === "morning" ? "AM" : e.time_of_day === "evening" ? "PM" : "";
+      return {
+        date: slot ? `${label} ${slot}` : label,
+        weight: Number(e.weight_lbs),
+      };
+    });
 
   if (data.length === 0) {
     return (

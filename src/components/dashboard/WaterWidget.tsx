@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Droplets, Minus, Plus } from "lucide-react";
+import { Droplets, Minus, Plus, Share2, Check } from "lucide-react";
 import { WaterLogEntry } from "@/types";
 import { localDateStr } from "@/lib/utils";
+import { shareOrCopy } from "@/lib/shareUtils";
 
 const GLASS_OZ = 8;
 const BASE_HYDRATION_OZ = 64;
@@ -52,6 +53,7 @@ export function WaterWidget({ sodiumMgToday, hasFoodLogged }: WaterWidgetProps) 
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [shareDone, setShareDone] = useState(false);
 
   const today = localDateStr();
 
@@ -132,16 +134,51 @@ export function WaterWidget({ sodiumMgToday, hasFoodLogged }: WaterWidgetProps) 
     }
   }
 
+  async function handleShare() {
+    if (entries.length === 0) return;
+    const dateLabel = new Date().toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+    const lines = [
+      `Water Log - ${dateLabel}`,
+      `Consumed: ${consumedOz} oz`,
+      `Recommended: ${recommended} oz`,
+      `Progress: ${Math.round(pct * 100)}% (${glassesLogged}/${glassesNeeded} glasses)`,
+      `Last glass: ${elapsedSinceLast ?? "not logged yet"}`,
+      `Sodium today: ${Math.round(sodiumMgToday).toLocaleString()} mg`,
+    ];
+    await shareOrCopy(lines.join("\n"), "Water Intake");
+    setShareDone(true);
+    setTimeout(() => setShareDone(false), 2000);
+  }
+
   const progressColor =
     pct >= 1 ? "bg-green-500" : pct >= 0.6 ? "bg-sky-500" : "bg-sky-400";
 
   return (
     <Card>
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-3 flex flex-row items-center justify-between">
         <CardTitle className="text-base flex items-center gap-2">
           <Droplets className="h-4 w-4 text-sky-500" />
           Water to Offset Sodium
         </CardTitle>
+        {entries.length > 0 && (
+          <Button variant="outline" size="sm" onClick={handleShare} className="h-8 gap-1.5">
+            {shareDone ? (
+              <>
+                <Check className="h-3.5 w-3.5 text-green-600" />
+                Shared
+              </>
+            ) : (
+              <>
+                <Share2 className="h-3.5 w-3.5" />
+                Share
+              </>
+            )}
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {!hasFoodLogged ? (

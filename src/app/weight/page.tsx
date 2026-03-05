@@ -14,12 +14,16 @@ import { WeightTrendChart } from "@/components/weight/WeightTrendChart";
 import { WeightHistoryTable } from "@/components/weight/WeightHistoryTable";
 import { GoalWeightCard } from "@/components/weight/GoalWeightCard";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { WeightEntry } from "@/types";
+import { shareOrCopy } from "@/lib/shareUtils";
+import { Share2, Check } from "lucide-react";
 
 export default function WeightPage() {
   const [entries, setEntries] = useState<WeightEntry[]>([]);
   const [weeks, setWeeks] = useState("12");
   const [loading, setLoading] = useState(true);
+  const [shareLabel, setShareLabel] = useState<"share" | "done">("share");
   const [goalWeight, setGoalWeight] = useState<number | null>(() => {
     if (typeof window === "undefined") return null;
     const v = localStorage.getItem("goalWeight");
@@ -53,6 +57,34 @@ export default function WeightPage() {
   async function handleDelete(id: number) {
     await fetch(`/api/weight/${id}`, { method: "DELETE" });
     setEntries((prev) => prev.filter((e) => e.id !== id));
+  }
+
+  async function handleShareHistory() {
+    if (entries.length === 0) return;
+
+    const sorted = [...entries].sort((a, b) => {
+      const dateCmp = b.logged_at.localeCompare(a.logged_at);
+      if (dateCmp !== 0) return dateCmp;
+      return (a.time_of_day ?? "").localeCompare(b.time_of_day ?? "");
+    });
+
+    const lines = [
+      `Weight Log - Last ${weeks} week${weeks === "1" ? "" : "s"}`,
+      "",
+      ...sorted.map((entry) => {
+        const slot =
+          entry.time_of_day === "morning"
+            ? "morning"
+            : entry.time_of_day === "evening"
+              ? "evening"
+              : "entry";
+        return `${entry.logged_at} (${slot}): ${Number(entry.weight_lbs).toFixed(1)} lbs${entry.note ? ` - ${entry.note}` : ""}`;
+      }),
+    ];
+
+    await shareOrCopy(lines.join("\n"), "Weight Log");
+    setShareLabel("done");
+    setTimeout(() => setShareLabel("share"), 2000);
   }
 
   const sortedEntries = [...entries].sort((a, b) => b.logged_at.localeCompare(a.logged_at));
@@ -123,8 +155,23 @@ export default function WeightPage() {
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>History</CardTitle>
+              {!loading && entries.length > 0 && (
+                <Button variant="outline" size="sm" onClick={handleShareHistory} className="h-8 gap-1.5">
+                  {shareLabel === "done" ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-green-600" />
+                      Shared
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="h-3.5 w-3.5" />
+                      Share
+                    </>
+                  )}
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {loading ? (

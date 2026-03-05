@@ -295,6 +295,23 @@ export default function DashboardPage() {
         />
       )}
 
+      {!loading && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Gut-Friendly Reminders</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              Don&apos;t overload protein shakes trying to max out protein in one hit. Too much at once can upset your gut.
+            </p>
+            <p>
+              If you had diarrhea today, keep tomorrow simple with binding foods like toast or rice, then ramp protein back up gradually.
+            </p>
+            <p>Hydrate aggressively while your gut settles.</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Charts */}
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>
