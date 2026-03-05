@@ -28,37 +28,34 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account }) {
       const email = user.email?.trim();
       if (!email) return false;
-      const { firstName, lastName } = splitName(user.name);
-      await getOrCreateUserId({
-        email,
-        firstName,
-        lastName,
-        imageUrl: user.image ?? null,
-        provider: account?.provider ?? null,
-        providerAccountId: account?.providerAccountId ?? null,
-      });
+      // Keep sign-in callback lightweight; user provisioning happens in jwt callback.
+      void account;
       return true;
     },
     async jwt({ token, account, user }) {
-      if (account && user?.email) {
-        const { firstName, lastName } = splitName(user.name);
-        const userId = await getOrCreateUserId({
-          email: user.email,
-          firstName,
-          lastName,
-          imageUrl: user.image ?? null,
-          provider: account.provider,
-          providerAccountId: account.providerAccountId,
-        });
-        token.userId = String(userId);
-        return token;
-      }
-
-      if (!token.userId && token.email) {
-        const existingUserId = await findUserIdByEmail(String(token.email));
-        if (existingUserId) {
-          token.userId = String(existingUserId);
+      try {
+        if (account && user?.email) {
+          const { firstName, lastName } = splitName(user.name);
+          const userId = await getOrCreateUserId({
+            email: user.email,
+            firstName,
+            lastName,
+            imageUrl: user.image ?? null,
+            provider: account.provider,
+            providerAccountId: account.providerAccountId,
+          });
+          token.userId = String(userId);
+          return token;
         }
+
+        if (!token.userId && token.email) {
+          const existingUserId = await findUserIdByEmail(String(token.email));
+          if (existingUserId) {
+            token.userId = String(existingUserId);
+          }
+        }
+      } catch (error) {
+        console.error("NextAuth jwt callback error:", error);
       }
       return token;
     },
