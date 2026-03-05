@@ -42,6 +42,7 @@ const desktopTabs = [
 export function TabNav() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = () => setMenuOpen(false);
 
   function downloadCSV(filename: string, rows: string[][]) {
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -120,13 +121,14 @@ export function TabNav() {
             <SheetHeader>
               <SheetTitle>Menu</SheetTitle>
             </SheetHeader>
-            <div className="mt-4 flex flex-col gap-1">
+            <div className="mt-4 px-4 pb-4 flex flex-col gap-1">
               {[...tabs, profileTab].map(({ href, label, icon: Icon }) => {
                 const active = pathname === href || pathname.startsWith(href + "/");
                 return (
                   <Link
                     key={href}
                     href={href}
+                    onClick={closeMenu}
                     className={cn(
                       "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
                       active
