@@ -112,12 +112,15 @@ export function TabNav() {
       <div className="md:hidden fixed top-1 left-3 z-40">
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
           <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shadow-sm bg-background/95">
-              <Menu className="h-4 w-4" />
+            <Button variant="outline" size="icon" className="h-11 w-11 rounded-xl shadow-sm bg-background/95">
+              <Menu className="h-6 w-6" />
               <span className="sr-only">Open menu</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-screen max-w-none sm:max-w-none">
+          <SheetContent
+            side="left"
+            className="[&_[data-slot=sheet-close]]:h-10 [&_[data-slot=sheet-close]]:w-10 [&_[data-slot=sheet-close]_svg]:size-5"
+          >
             <SheetHeader>
               <SheetTitle>Menu</SheetTitle>
             </SheetHeader>
