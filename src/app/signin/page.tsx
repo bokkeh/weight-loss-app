@@ -22,11 +22,6 @@ export default async function SignInPage() {
             Continue with Google
           </Link>
         </Button>
-        <Button asChild variant="outline" className="w-full">
-          <Link href="/api/auth/signin/github?callbackUrl=/dashboard">
-            Continue with GitHub
-          </Link>
-        </Button>
       </div>
     </div>
   );
