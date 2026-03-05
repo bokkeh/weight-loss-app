@@ -89,6 +89,26 @@ export async function POST(req: Request) {
       )
     `;
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS user_profiles (
+        id                    INTEGER PRIMARY KEY DEFAULT 1,
+        first_name            TEXT,
+        last_name             TEXT,
+        email                 TEXT,
+        phone                 TEXT,
+        profile_image_url     TEXT,
+        dietary_restrictions  TEXT[],
+        created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+
+    await sql`
+      INSERT INTO user_profiles (id)
+      VALUES (1)
+      ON CONFLICT (id) DO NOTHING
+    `;
+
     // Water log table
     await sql`
       CREATE TABLE IF NOT EXISTS water_log_entries (
@@ -123,6 +143,13 @@ export async function POST(req: Request) {
         ) THEN
           CREATE TRIGGER recipes_updated_at
             BEFORE UPDATE ON recipes
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+        END IF;
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_trigger WHERE tgname = 'user_profiles_updated_at'
+        ) THEN
+          CREATE TRIGGER user_profiles_updated_at
+            BEFORE UPDATE ON user_profiles
             FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
         END IF;
       END;

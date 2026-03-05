@@ -140,15 +140,19 @@ export default function DashboardPage() {
 
     async function load() {
       const today = localDateStr();
-      const [w, f, t, s] = await Promise.all([
+      const [w, f, t, s, p] = await Promise.all([
         fetch("/api/weight?weeks=4").then((r) => r.json()),
         fetch("/api/food-log?weeks=1").then((r) => r.json()),
         fetch(`/api/food-log?date=${today}`).then((r) => r.json()),
         fetch(`/api/stats?today=${today}`).then((r) => r.json()),
+        fetch("/api/profile").then((r) => r.json()).catch(() => null),
       ]);
       setWeightEntries(Array.isArray(w) ? w : []);
       setFoodEntries(Array.isArray(f) ? f : []);
       setTodayFood(Array.isArray(t) ? t : []);
+      if (p?.first_name) {
+        setFirstName(String(p.first_name).trim() || "there");
+      }
       if (!s.error) {
         setStreak(s.streak ?? 0);
         setWeeklyAvgCalories(s.weeklyAvgCalories ?? null);
@@ -279,9 +283,9 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold">{greeting}</h1>
           <p className="text-muted-foreground text-sm mt-1">Your progress at a glance.</p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-col items-end gap-2">
           {weatherInfo && weather && (
-            <div className="hidden sm:flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-card">
+            <div className="flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-card">
               <span className="text-xl leading-none">{weatherInfo.emoji}</span>
               <div className="leading-tight">
                 <p className="text-sm font-semibold">{Math.round(weather.tempF)}°F</p>

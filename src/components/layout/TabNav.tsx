@@ -9,6 +9,7 @@ import {
   UtensilsCrossed,
   MessageCircle,
   BookOpen,
+  User,
 } from "lucide-react";
 
 const tabs = [
@@ -17,6 +18,7 @@ const tabs = [
   { href: "/food-log", label: "Food Log", icon: UtensilsCrossed },
   { href: "/chat", label: "AI Coach", icon: MessageCircle },
   { href: "/recipes", label: "Recipes", icon: BookOpen },
+  { href: "/profile", label: "Profile", icon: User },
 ];
 
 export function TabNav() {

@@ -16,7 +16,7 @@ export function MacroDonutChart({ totals }: Props) {
   const totalKcal = raw.reduce((sum, d) => sum + d.value, 0);
   const data = raw.map((d) => ({
     ...d,
-    percent: totalKcal > 0 ? Math.round((d.value / totalKcal) * 100) : 0,
+    sharePct: totalKcal > 0 ? Math.round((d.value / totalKcal) * 100) : 0,
   }));
 
   if (data.length === 0) {
@@ -47,7 +47,7 @@ export function MacroDonutChart({ totals }: Props) {
         </Pie>
         <Tooltip
           formatter={(v, _name, item) => {
-            const pct = (item?.payload as { percent?: number } | undefined)?.percent ?? 0;
+            const pct = (item?.payload as { sharePct?: number } | undefined)?.sharePct ?? 0;
             return [`${v} kcal (${pct}%)`];
           }}
           wrapperStyle={{ zIndex: 50 }}
@@ -57,7 +57,7 @@ export function MacroDonutChart({ totals }: Props) {
           iconType="circle"
           iconSize={8}
           wrapperStyle={{ fontSize: "12px" }}
-          formatter={(value, _entry, index) => `${value} ${data[index]?.percent ?? 0}%`}
+          formatter={(value, _entry, index) => `${value} ${data[index]?.sharePct ?? 0}%`}
         />
       </PieChart>
     </ResponsiveContainer>

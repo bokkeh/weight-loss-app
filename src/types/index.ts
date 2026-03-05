@@ -50,6 +50,18 @@ export interface ChatMessage {
   created_at: string;
 }
 
+export interface UserProfile {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
+  profile_image_url?: string;
+  dietary_restrictions?: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WaterLogEntry {
   id: number;
   logged_at: string;
