@@ -165,6 +165,14 @@ export function TabNav() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icon.svg" alt="WeightTrack logo" className="h-7 w-7" />
           </Link>
+          <Link
+            href="/profile"
+            className="absolute right-3 h-11 w-11 rounded-xl inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            aria-label="Go to profile"
+            onClick={closeMenu}
+          >
+            <User className="h-6 w-6" />
+          </Link>
         </div>
       </div>
 
