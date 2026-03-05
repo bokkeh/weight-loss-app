@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Recipe } from "@/types";
 import { shareOrCopy } from "@/lib/shareUtils";
-import { ImageOff, Camera, Trash2, Upload, Link, Share2, Check } from "lucide-react";
+import { ImageOff, Camera, Trash2, Upload, Link, Share2, Check, Sparkles, Loader2 } from "lucide-react";
 
 interface Props {
   recipe: Recipe;
@@ -30,6 +30,7 @@ export function RecipeCard({ recipe, onClick, onDeleted, onPhotoUpdated }: Props
   const [photoPreview, setPhotoPreview] = useState<string | null>(recipe.image_url ?? null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [shareDone, setShareDone] = useState(false);
 
   function stopProp(e: React.MouseEvent) {
@@ -92,6 +93,42 @@ export function RecipeCard({ recipe, onClick, onDeleted, onPhotoUpdated }: Props
       alert(String(err));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleGeneratePhoto() {
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/recipes/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: recipe.name,
+          description: recipe.description ?? "",
+          ingredients: recipe.ingredients ?? "",
+          instructions: recipe.instructions ?? "",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? `Image generation failed (${res.status})`);
+
+      const imageDataUrl = typeof data.imageDataUrl === "string" ? data.imageDataUrl : null;
+      if (!imageDataUrl) throw new Error("No image returned from AI generation.");
+
+      const blob = await fetch(imageDataUrl).then((r) => r.blob());
+      const ext = blob.type.includes("jpeg") ? "jpg" : "png";
+      const file = new File([blob], `recipe-generated-${recipe.id}-${Date.now()}.${ext}`, {
+        type: blob.type || "image/png",
+      });
+
+      setPhotoMode("file");
+      setPhotoFile(file);
+      setPhotoUrl("");
+      setPhotoPreview(imageDataUrl);
+    } catch (err) {
+      alert(String(err));
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -220,6 +257,23 @@ export function RecipeCard({ recipe, onClick, onDeleted, onPhotoUpdated }: Props
                 }`}
               >
                 <Upload className="h-3 w-3" /> Upload File
+              </button>
+              <button
+                type="button"
+                onClick={handleGeneratePhoto}
+                disabled={generating}
+                className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-md transition-colors text-muted-foreground hover:text-foreground disabled:opacity-60"
+                title="Generate image with AI"
+              >
+                {generating ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin" /> Generating
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3 w-3" /> Generate AI
+                  </>
+                )}
               </button>
             </div>
 

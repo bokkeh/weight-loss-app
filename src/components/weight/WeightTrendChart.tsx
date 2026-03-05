@@ -34,7 +34,9 @@ export function WeightTrendChart({ entries, goalWeight }: Props) {
         ? dateOnly
         : parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" });
       const slot = e.time_of_day === "morning" ? "AM" : e.time_of_day === "evening" ? "PM" : "";
+      const xKey = `${dateOnly}-${e.time_of_day ?? "entry"}-${e.id}`;
       return {
+        xKey,
         date: slot ? `${label} ${slot}` : label,
         weight: Number(e.weight_lbs),
       };
@@ -57,10 +59,11 @@ export function WeightTrendChart({ entries, goalWeight }: Props) {
       <LineChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
         <XAxis
-          dataKey="date"
+          dataKey="xKey"
           tick={{ fontSize: 12 }}
           tickLine={false}
           axisLine={false}
+          tickFormatter={(_, idx) => data[idx]?.date ?? ""}
         />
         <YAxis
           domain={[minY, maxY]}
@@ -92,10 +95,11 @@ export function WeightTrendChart({ entries, goalWeight }: Props) {
         <Line
           type="monotone"
           dataKey="weight"
-          stroke="hsl(var(--primary))"
+          stroke="#3b82f6"
           strokeWidth={2}
-          dot={{ r: 4 }}
-          activeDot={{ r: 6 }}
+          connectNulls
+          dot={{ r: 4, fill: "#ffffff", stroke: "#3b82f6", strokeWidth: 2 }}
+          activeDot={{ r: 6, fill: "#3b82f6", stroke: "#ffffff", strokeWidth: 2 }}
         />
       </LineChart>
     </ResponsiveContainer>

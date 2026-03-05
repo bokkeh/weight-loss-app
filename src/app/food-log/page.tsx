@@ -53,6 +53,13 @@ function sumMacros(entries: FoodLogEntry[]): DailyMacroTotals {
   );
 }
 
+function getEntryTimestamp(entry: FoodLogEntry): number {
+  const createdMs = new Date(entry.created_at).getTime();
+  if (!Number.isNaN(createdMs)) return createdMs;
+  const fallbackMs = new Date(`${entry.logged_at}T12:00:00`).getTime();
+  return Number.isNaN(fallbackMs) ? 0 : fallbackMs;
+}
+
 function buildShareText(entries: FoodLogEntry[], date: Date): string {
   const dateLabel = date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   const lines: string[] = [`📊 Food Log — ${dateLabel}`, ""];
@@ -98,39 +105,77 @@ function isHealthyForMeal(entry: FoodLogEntry, meal: "breakfast" | "lunch" | "di
   return calories >= 250 && calories <= 750 && protein >= 20 && sodium <= 900;
 }
 
-function buildMealRecommendation(recentEntries: FoodLogEntry[]): string {
-  const hour = new Date().getHours();
-  const targetMeal = targetMealForHour(hour);
-  const displayMeal = targetMeal.charAt(0).toUpperCase() + targetMeal.slice(1);
+function buildMealRecommendation(todayEntries: FoodLogEntry[], recentEntries: FoodLogEntry[]): string {
+  const now = new Date();
+  const targetMeal = targetMealForHour(now.getHours());
+  const mealOrder: Array<"breakfast" | "lunch" | "dinner" | "snack"> = [
+    "breakfast",
+    "lunch",
+    "dinner",
+    "snack",
+  ];
+  const targetIdx = mealOrder.indexOf(targetMeal);
 
-  const sorted = [...recentEntries].sort((a, b) => {
-    const dateCmp = b.logged_at.localeCompare(a.logged_at);
-    if (dateCmp !== 0) return dateCmp;
-    return b.created_at.localeCompare(a.created_at);
-  });
+  // If target meal is already logged today, advance to next likely meal slot.
+  const todayMeals = new Set(todayEntries.map((e) => e.meal_type).filter(Boolean));
+  let nextMeal = targetMeal;
+  if (todayMeals.has(targetMeal)) {
+    const fallback = mealOrder.slice(targetIdx + 1).find((m) => !todayMeals.has(m));
+    if (fallback) nextMeal = fallback;
+  }
 
-  const matchingHealthy = sorted.find(
-    (e) => e.meal_type === targetMeal && isHealthyForMeal(e, targetMeal)
+  const cutoffMs = now.getTime() - 72 * 60 * 60 * 1000;
+  const recent72 = recentEntries
+    .filter((e) => getEntryTimestamp(e) >= cutoffMs)
+    .sort((a, b) => getEntryTimestamp(b) - getEntryTimestamp(a));
+
+  const todayTotals = sumMacros(todayEntries);
+  const proteinLeft = Math.max(0, GOALS.protein_g - todayTotals.protein_g);
+  const fiberLeft = Math.max(0, GOALS.fiber_g - todayTotals.fiber_g);
+  const caloriesLeft = Math.max(0, GOALS.calories - todayTotals.calories);
+
+  const candidates = recent72.filter(
+    (e) => (e.meal_type === nextMeal || e.meal_type === "snack") && isHealthyForMeal(e, nextMeal)
   );
-  const fallbackHealthy = sorted.find(
-    (e) => (e.meal_type === targetMeal || e.meal_type === "snack") && isHealthyForMeal(e, targetMeal)
-  );
-  const pick = matchingHealthy ?? fallbackHealthy;
 
-  if (pick) {
-    return `It's almost time for ${displayMeal.toLowerCase()}. If you have any ${pick.food_name.toLowerCase()} left, that's a strong repeat.`;
+  const scored = candidates
+    .map((e) => {
+      const protein = Number(e.protein_g);
+      const fiber = Number(e.fiber_g);
+      const calories = Number(e.calories);
+      const sodium = Number(e.sodium_mg);
+      const proteinScore = proteinLeft > 30 ? protein * 2 : protein;
+      const fiberScore = fiberLeft > 10 ? fiber * 1.5 : fiber;
+      const caloriePenalty = calories > caloriesLeft && caloriesLeft > 0 ? 20 : 0;
+      const sodiumPenalty = sodium > 1000 ? 8 : 0;
+      const totalScore = proteinScore + fiberScore - caloriePenalty - sodiumPenalty;
+      return { entry: e, totalScore };
+    })
+    .sort((a, b) => b.totalScore - a.totalScore);
+
+  const best = scored[0]?.entry;
+  const displayMeal = nextMeal.charAt(0).toUpperCase() + nextMeal.slice(1);
+
+  if (best) {
+    const macroHint =
+      proteinLeft > 25
+        ? "You're still protein-light today, so that repeat helps."
+        : fiberLeft > 8
+          ? "You still need some fiber today, and that choice keeps things balanced."
+          : "It fits your current day totals well.";
+    return `What's next for ${displayMeal.toLowerCase()}? If you have any ${best.food_name.toLowerCase()} left from recent meals, go for that. ${macroHint}`;
   }
 
-  if (targetMeal === "breakfast") {
-    return "It's almost time for breakfast. Go with eggs or yogurt to start high-protein and steady.";
+  if (nextMeal === "breakfast") {
+    return "It's almost breakfast. Keep it simple: eggs or yogurt, then add fruit if fiber is low.";
   }
-  if (targetMeal === "lunch") {
-    return "What's for lunch? Build around a lean protein + fiber carbs so your afternoon energy stays stable.";
+  if (nextMeal === "lunch") {
+    return "What's for lunch? Center it on lean protein and a fiber carb to steady afternoon hunger.";
   }
-  if (targetMeal === "dinner") {
-    return "Dinner idea: keep protein high, pair with veggies, and keep sodium moderate so tomorrow's weigh-in is cleaner.";
+  if (nextMeal === "dinner") {
+    return "Dinner target: protein + vegetables, and keep sodium controlled for a cleaner next weigh-in.";
   }
-  return "Late-night snack? Keep it light and protein-forward so you don't overshoot calories.";
+  return "Snack window: choose something protein-forward and moderate in calories to stay aligned with today's goals.";
 }
 
 export default function FoodLogPage() {
@@ -165,16 +210,19 @@ export default function FoodLogPage() {
 
   function handleAdded(entry: FoodLogEntry) {
     setEntries((prev) => [...prev, entry]);
+    setRecentEntries((prev) => [entry, ...prev]);
     setOpen(false);
   }
 
   async function handleDelete(id: number) {
     await fetch(`/api/food-log/${id}`, { method: "DELETE" });
     setEntries((prev) => prev.filter((e) => e.id !== id));
+    setRecentEntries((prev) => prev.filter((e) => e.id !== id));
   }
 
   function handleUpdated(updated: FoodLogEntry) {
     setEntries((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+    setRecentEntries((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
   }
 
   async function handleShare() {
@@ -185,7 +233,7 @@ export default function FoodLogPage() {
   }
 
   const totals = sumMacros(entries);
-  const mealRecommendation = buildMealRecommendation(recentEntries);
+  const mealRecommendation = buildMealRecommendation(entries, recentEntries);
 
   return (
     <div className="space-y-6">

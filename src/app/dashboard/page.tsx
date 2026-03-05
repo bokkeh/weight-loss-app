@@ -14,6 +14,24 @@ import { Scale, Flame, Beef, TrendingDown, Sparkles, Download, Loader2, Share2, 
 import { shareOrCopy } from "@/lib/shareUtils";
 import { localDateStr } from "@/lib/utils";
 
+const GUT_TIP_VARIANTS: string[][] = [
+  [
+    "Don't overload protein shakes trying to max out protein in one hit. Too much at once can upset your gut.",
+    "If your stomach feels off, split protein across meals instead of mega-dosing one shake.",
+    "Hydrate consistently while increasing protein.",
+  ],
+  [
+    "If you had diarrhea today, keep tomorrow simple with binding foods like toast or rice.",
+    "Once your gut settles, ramp protein back up gradually instead of forcing heavy meals immediately.",
+    "Add extra water and electrolytes to recover.",
+  ],
+  [
+    "High protein works best when your gut can tolerate it. Bigger isn't always better in one serving.",
+    "Use easy foods first after a rough digestion day, then return to your usual protein targets.",
+    "Water intake is part of digestion support, not just hydration.",
+  ],
+];
+
 function sumMacros(entries: FoodLogEntry[]): DailyMacroTotals {
   return entries.reduce(
     (acc, e) => ({
@@ -81,6 +99,7 @@ export default function DashboardPage() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [calorieGoal, setCalorieGoal] = useState(2100);
   const [shareLabel, setShareLabel] = useState<"share" | "done">("share");
+  const [gutTipIndex, setGutTipIndex] = useState(0);
 
   useEffect(() => {
     const saved = localStorage.getItem("calorieGoal");
@@ -88,6 +107,13 @@ export default function DashboardPage() {
     const weekKey = getWeekKey();
     const cached = localStorage.getItem(`weeklySummary_${weekKey}`);
     if (cached) setSummary(cached);
+    const tipKey = "dashboard_gut_tip_index";
+    const prevTip = Number(localStorage.getItem(tipKey) ?? "-1");
+    const nextTip = Number.isFinite(prevTip)
+      ? (prevTip + 1) % GUT_TIP_VARIANTS.length
+      : 0;
+    setGutTipIndex(nextTip);
+    localStorage.setItem(tipKey, String(nextTip));
 
     async function load() {
       const today = localDateStr();
@@ -301,13 +327,9 @@ export default function DashboardPage() {
             <CardTitle className="text-base">Gut-Friendly Reminders</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>
-              Don&apos;t overload protein shakes trying to max out protein in one hit. Too much at once can upset your gut.
-            </p>
-            <p>
-              If you had diarrhea today, keep tomorrow simple with binding foods like toast or rice, then ramp protein back up gradually.
-            </p>
-            <p>Hydrate aggressively while your gut settles.</p>
+            {GUT_TIP_VARIANTS[gutTipIndex].map((tip) => (
+              <p key={tip}>{tip}</p>
+            ))}
           </CardContent>
         </Card>
       )}
