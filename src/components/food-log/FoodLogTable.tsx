@@ -237,7 +237,7 @@ export function FoodLogTable({ entries, onDelete, onUpdated }: Props) {
               {meal.charAt(0).toUpperCase() + meal.slice(1)}
             </span>
             <span className="text-xs text-muted-foreground">
-              {sumMacros(items).calories.toFixed(0)} kcal
+              {sumMacros(items).calories.toFixed(0)} kcal • {sumMacros(items).sodium_mg.toFixed(0)} mg sodium
             </span>
           </div>
 
@@ -271,6 +271,7 @@ export function FoodLogTable({ entries, onDelete, onUpdated }: Props) {
                         <span className="text-xs font-mono text-blue-600">{Number(entry.protein_g).toFixed(1)}g P</span>
                         <span className="text-xs font-mono text-yellow-600">{Number(entry.carbs_g).toFixed(1)}g C</span>
                         <span className="text-xs font-mono text-red-600">{Number(entry.fat_g).toFixed(1)}g F</span>
+                        <span className="text-xs font-mono text-cyan-600">{Number(entry.sodium_mg).toFixed(0)}mg Na</span>
                         {Number(entry.fiber_g) > 0 && (
                           <span className="text-xs font-mono text-green-600">{Number(entry.fiber_g).toFixed(1)}g Fiber</span>
                         )}
@@ -313,6 +314,7 @@ export function FoodLogTable({ entries, onDelete, onUpdated }: Props) {
             <span className="text-yellow-600">C: {totals.carbs_g.toFixed(1)}g</span>
             <span className="text-red-600">F: {totals.fat_g.toFixed(1)}g</span>
             <span className="text-green-600">Fiber: {totals.fiber_g.toFixed(1)}g</span>
+            <span className="text-cyan-600">Na: {totals.sodium_mg.toFixed(0)}mg</span>
           </div>
         </div>
       </div>

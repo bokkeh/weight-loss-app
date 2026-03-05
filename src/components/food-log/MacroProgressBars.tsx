@@ -1,6 +1,5 @@
 "use client";
 
-import { Progress } from "@/components/ui/progress";
 import { DailyMacroTotals } from "@/types";
 
 const GOALS = {
