@@ -3,27 +3,31 @@ import sql from "@/lib/db";
 import { requireUserId } from "@/lib/route-auth";
 
 async function ensureProfileTable() {
-  await sql`
-    CREATE TABLE IF NOT EXISTS user_profiles (
-      id                    SERIAL PRIMARY KEY,
-      first_name            TEXT,
-      last_name             TEXT,
-      email                 TEXT,
-      phone                 TEXT,
-      profile_image_url     TEXT,
-      dietary_restrictions  TEXT[],
-      created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS user_profiles (
+        id                    SERIAL PRIMARY KEY,
+        first_name            TEXT,
+        last_name             TEXT,
+        email                 TEXT,
+        phone                 TEXT,
+        profile_image_url     TEXT,
+        dietary_restrictions  TEXT[],
+        created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+  } catch (error) {
+    console.error("ensureProfileTable failed:", error);
+  }
 }
 
 export async function GET() {
-  const authState = await requireUserId();
-  if ("response" in authState) return authState.response;
-  const { userId } = authState;
-
   try {
+    const authState = await requireUserId();
+    if ("response" in authState) return authState.response;
+    const { userId } = authState;
+
     await ensureProfileTable();
     const [profile] = await sql`
       SELECT id, first_name, last_name, email, phone, profile_image_url, dietary_restrictions, created_at::text, updated_at::text
@@ -45,11 +49,11 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
-  const authState = await requireUserId();
-  if ("response" in authState) return authState.response;
-  const { userId } = authState;
-
   try {
+    const authState = await requireUserId();
+    if ("response" in authState) return authState.response;
+    const { userId } = authState;
+
     await ensureProfileTable();
     const body = await req.json().catch(() => ({}));
     const {
