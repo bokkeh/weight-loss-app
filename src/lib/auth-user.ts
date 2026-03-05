@@ -2,6 +2,16 @@ import sql from "@/lib/db";
 
 let ensuredSchema: Promise<void> | null = null;
 
+async function syncUserProfileIdSequence() {
+  await sql`
+    SELECT setval(
+      pg_get_serial_sequence('user_profiles', 'id'),
+      GREATEST((SELECT COALESCE(MAX(id), 1) FROM user_profiles), 1),
+      true
+    )
+  `;
+}
+
 async function ensureMultiUserSchemaInternal() {
   await sql`
     CREATE TABLE IF NOT EXISTS user_profiles (
@@ -74,6 +84,7 @@ async function ensureMultiUserSchemaInternal() {
   `;
 
   await sql`INSERT INTO user_profiles (id) VALUES (1) ON CONFLICT (id) DO NOTHING`;
+  await syncUserProfileIdSequence();
 
   await sql`ALTER TABLE weight_entries ADD COLUMN IF NOT EXISTS user_id INTEGER`;
   await sql`UPDATE weight_entries SET user_id = 1 WHERE user_id IS NULL`;
@@ -178,16 +189,36 @@ export async function getOrCreateUserId(params: {
     ? Number(existing.id)
     : Number(
         (
-          await sql`
-            INSERT INTO user_profiles (email, first_name, last_name, profile_image_url)
-            VALUES (
-              ${email},
-              ${firstName},
-              ${lastName},
-              ${imageUrl}
-            )
-            RETURNING id
-          `
+          await (async () => {
+            try {
+              return await sql`
+                INSERT INTO user_profiles (email, first_name, last_name, profile_image_url)
+                VALUES (
+                  ${email},
+                  ${firstName},
+                  ${lastName},
+                  ${imageUrl}
+                )
+                RETURNING id
+              `;
+            } catch (error) {
+              const e = error as { code?: string; constraint?: string };
+              if (e.code === "23505" && e.constraint === "user_profiles_pkey") {
+                await syncUserProfileIdSequence();
+                return await sql`
+                  INSERT INTO user_profiles (email, first_name, last_name, profile_image_url)
+                  VALUES (
+                    ${email},
+                    ${firstName},
+                    ${lastName},
+                    ${imageUrl}
+                  )
+                  RETURNING id
+                `;
+              }
+              throw error;
+            }
+          })()
         )[0].id
       );
 
