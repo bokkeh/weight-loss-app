@@ -29,6 +29,8 @@ interface GlobalTotals {
   users: number;
   profiles: number;
   historical_accounts: number;
+  signin_page_views_14d: number;
+  oauth_clicks_14d: number;
   weight_entries: number;
   food_logs: number;
   water_logs: number;
@@ -179,12 +181,35 @@ export default async function AdminPage() {
         FROM auth_login_events
         WHERE email IS NOT NULL AND TRIM(email) <> ''
       ) AS historical_accounts,
+      (
+        SELECT COUNT(*)::int
+        FROM auth_signin_events
+        WHERE event_type = 'page_view'
+          AND created_at >= CURRENT_DATE - INTERVAL '14 days'
+      ) AS signin_page_views_14d,
+      (
+        SELECT COUNT(*)::int
+        FROM auth_signin_events
+        WHERE event_type = 'oauth_click'
+          AND created_at >= CURRENT_DATE - INTERVAL '14 days'
+      ) AS oauth_clicks_14d,
       (SELECT COUNT(*) FROM weight_entries)::int AS weight_entries,
       (SELECT COUNT(*) FROM food_log_entries)::int AS food_logs,
       (SELECT COUNT(*) FROM water_log_entries)::int AS water_logs,
       (SELECT COUNT(*) FROM recipes)::int AS recipes,
       (SELECT COUNT(*) FROM chat_messages)::int AS chat_messages
   `) as GlobalTotals[];
+
+  const signinTraffic = (await sql`
+    SELECT
+      created_at::date::text AS day,
+      COUNT(*) FILTER (WHERE event_type = 'page_view')::int AS page_views,
+      COUNT(*) FILTER (WHERE event_type = 'oauth_click')::int AS oauth_clicks
+    FROM auth_signin_events
+    WHERE created_at >= CURRENT_DATE - INTERVAL '14 days'
+    GROUP BY created_at::date
+    ORDER BY day DESC
+  `) as Array<{ day: string; page_views: number; oauth_clicks: number }>;
 
   const historicalAccounts = (await sql`
     SELECT
@@ -212,11 +237,31 @@ export default async function AdminPage() {
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Users</p><p className="font-semibold">{totals?.users ?? 0}</p></div>
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Profiles</p><p className="font-semibold">{totals?.profiles ?? 0}</p></div>
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Historical Accounts</p><p className="font-semibold">{totals?.historical_accounts ?? 0}</p></div>
+          <div className="rounded-lg border p-3"><p className="text-muted-foreground">Sign-In Page Views (14d)</p><p className="font-semibold">{totals?.signin_page_views_14d ?? 0}</p></div>
+          <div className="rounded-lg border p-3"><p className="text-muted-foreground">OAuth Clicks (14d)</p><p className="font-semibold">{totals?.oauth_clicks_14d ?? 0}</p></div>
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Weight Logs</p><p className="font-semibold">{totals?.weight_entries ?? 0}</p></div>
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Food Logs</p><p className="font-semibold">{totals?.food_logs ?? 0}</p></div>
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Water Logs</p><p className="font-semibold">{totals?.water_logs ?? 0}</p></div>
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Recipes</p><p className="font-semibold">{totals?.recipes ?? 0}</p></div>
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Chat Messages</p><p className="font-semibold">{totals?.chat_messages ?? 0}</p></div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border bg-card p-4">
+        <h2 className="font-semibold mb-3">Sign-In Traffic (Last 14 Days)</h2>
+        <div className="space-y-2">
+          {signinTraffic.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No sign-in traffic events yet.</p>
+          ) : (
+            signinTraffic.map((row) => (
+              <div key={row.day} className="flex items-center justify-between text-sm">
+                <span>{new Date(`${row.day}T12:00:00`).toLocaleDateString()}</span>
+                <span className="font-medium">
+                  Views {row.page_views} | OAuth clicks {row.oauth_clicks}
+                </span>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -8,12 +8,40 @@ import { Button } from "@/components/ui/button";
 export default function SignInPage() {
   const { status } = useSession();
   const router = useRouter();
+  const trackedPageView = useRef(false);
 
   useEffect(() => {
     if (status === "authenticated") {
       router.replace("/dashboard");
     }
   }, [status, router]);
+
+  useEffect(() => {
+    if (trackedPageView.current) return;
+    trackedPageView.current = true;
+    fetch("/api/auth/signin-event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        eventType: "page_view",
+        path: "/signin",
+      }),
+    }).catch(() => undefined);
+  }, []);
+
+  async function handleGoogleSignIn() {
+    await fetch("/api/auth/signin-event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        eventType: "oauth_click",
+        provider: "google",
+        path: "/signin",
+      }),
+    }).catch(() => undefined);
+
+    await signIn("google", { callbackUrl: "/dashboard" });
+  }
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center">
@@ -24,7 +52,7 @@ export default function SignInPage() {
         </p>
         <Button
           className="w-full"
-          onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+          onClick={handleGoogleSignIn}
         >
           Continue with Google
         </Button>
