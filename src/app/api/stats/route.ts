@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 
+function shiftDay(dayStr: string, offset: number): string {
+  const [y, m, d] = dayStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + offset);
+  return dt.toISOString().slice(0, 10);
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -9,7 +16,7 @@ export async function GET(req: Request) {
 
     // Get all unique logged dates from both weight and food log in the last 90 days
     const rows = await sql`
-      SELECT DISTINCT logged_at::date AS day
+      SELECT DISTINCT logged_at::date::text AS day
       FROM (
         SELECT logged_at FROM weight_entries
         UNION ALL
@@ -19,34 +26,26 @@ export async function GET(req: Request) {
       ORDER BY day DESC
     `;
 
-    // Compute streak using client's local date (falls back to server UTC if not provided)
-    const days = rows.map((r: { day: string }) => r.day as string).sort().reverse();
+    // Compute streak using client-local YYYY-MM-DD date strings
+    const days = rows.map((r: { day: string }) => String(r.day));
+    const daySet = new Set(days);
     let streak = 0;
 
     const todayStr = clientToday ?? new Date().toISOString().split("T")[0];
-    const todayDate = new Date(todayStr + "T12:00:00"); // noon avoids DST edge cases
-    const yesterdayDate = new Date(todayDate);
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterdayStr = yesterdayDate.toISOString().split("T")[0];
+    const yesterdayStr = shiftDay(todayStr, -1);
 
-    if (days.length > 0 && (days[0] === todayStr || days[0] === yesterdayStr)) {
-      const startOffset = days[0] === todayStr ? 0 : 1;
-      for (let i = 0; i < days.length; i++) {
-        const expected = new Date(todayDate);
-        expected.setDate(expected.getDate() - (i + startOffset));
-        const expectedStr = expected.toISOString().split("T")[0];
-        if (days[i] === expectedStr) {
-          streak++;
-        } else {
-          break;
-        }
-      }
+    let cursor: string | null = daySet.has(todayStr)
+      ? todayStr
+      : daySet.has(yesterdayStr)
+        ? yesterdayStr
+        : null;
+    while (cursor && daySet.has(cursor)) {
+      streak += 1;
+      cursor = shiftDay(cursor, -1);
     }
 
     // Weekly avg calories (last 7 days relative to client's today)
-    const sevenDaysAgo = new Date(todayDate);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split("T")[0];
+    const sevenDaysAgoStr = shiftDay(todayStr, -7);
 
     const calRows = await sql`
       SELECT

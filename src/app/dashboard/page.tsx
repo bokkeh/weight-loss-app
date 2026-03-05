@@ -118,6 +118,7 @@ export default function DashboardPage() {
   const [shareLabel, setShareLabel] = useState<"share" | "done">("share");
   const [gutTipIndex, setGutTipIndex] = useState(0);
   const [firstName, setFirstName] = useState("there");
+  const [profileImageUrl, setProfileImageUrl] = useState("");
   const [weather, setWeather] = useState<{ tempF: number; code: number } | null>(null);
 
   useEffect(() => {
@@ -152,6 +153,9 @@ export default function DashboardPage() {
       setTodayFood(Array.isArray(t) ? t : []);
       if (p?.first_name) {
         setFirstName(String(p.first_name).trim() || "there");
+      }
+      if (p?.profile_image_url) {
+        setProfileImageUrl(String(p.profile_image_url));
       }
       if (!s.error) {
         setStreak(s.streak ?? 0);
@@ -279,31 +283,39 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">{greeting}</h1>
-          <p className="text-muted-foreground text-sm mt-1">Your progress at a glance.</p>
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="w-16 h-16 rounded-full overflow-hidden border bg-muted shrink-0">
+            {profileImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
+            ) : null}
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold leading-tight">{greeting}</h1>
+            <p className="text-muted-foreground text-sm mt-1">Your progress at a glance.</p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <Button variant="outline" size="sm" onClick={handleShare} className="gap-1.5 shrink-0">
+                {shareLabel === "done" ? (
+                  <><Check className="h-3.5 w-3.5 text-green-600" /> Shared!</>
+                ) : (
+                  <><Share2 className="h-3.5 w-3.5" /> Share</>
+                )}
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-1.5 shrink-0">
+                <Download className="h-3.5 w-3.5" />
+                Export CSV
+              </Button>
+            </div>
+          </div>
         </div>
         <div className="flex flex-col items-end gap-2">
           {weatherInfo && weather && (
-            <div className="flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-card">
-              <span className="text-xl leading-none">{weatherInfo.emoji}</span>
-              <div className="leading-tight">
-                <p className="text-sm font-semibold">{Math.round(weather.tempF)}Â°F</p>
-                <p className="text-[11px] text-muted-foreground">{weatherInfo.label}</p>
-              </div>
+            <div className="text-right shrink-0 mt-1">
+              <p className="text-3xl leading-none">{weatherInfo.emoji}</p>
+              <p className="text-4xl font-semibold leading-tight mt-1">{Math.round(weather.tempF)}°F</p>
+              <p className="text-sm text-muted-foreground">{weatherInfo.label}</p>
             </div>
           )}
-          <Button variant="outline" size="sm" onClick={handleShare} className="gap-1.5 shrink-0">
-            {shareLabel === "done" ? (
-              <><Check className="h-3.5 w-3.5 text-green-600" /> Shared!</>
-            ) : (
-              <><Share2 className="h-3.5 w-3.5" /> Share</>
-            )}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-1.5 shrink-0">
-            <Download className="h-3.5 w-3.5" />
-            Export CSV
-          </Button>
         </div>
       </div>
 
