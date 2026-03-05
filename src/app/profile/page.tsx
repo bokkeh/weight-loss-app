@@ -45,7 +45,10 @@ export default function ProfilePage() {
       try {
         const res = await fetch("/api/profile");
         const raw = await res.text().catch(() => "");
-        const profile = parseJsonSafe<UserProfile & { error?: string }>(raw, {});
+        const profile = parseJsonSafe<UserProfile & { error?: string }>(
+          raw,
+          {} as UserProfile & { error?: string }
+        );
         if (!res.ok) throw new Error(profile.error ?? "Failed to load profile");
         setForm({
           first_name: profile.first_name ?? "",
