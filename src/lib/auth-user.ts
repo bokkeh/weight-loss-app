@@ -203,18 +203,36 @@ export async function getOrCreateUserId(params: {
               `;
             } catch (error) {
               const e = error as { code?: string; constraint?: string };
-              if (e.code === "23505" && e.constraint === "user_profiles_pkey") {
-                await syncUserProfileIdSequence();
-                return await sql`
-                  INSERT INTO user_profiles (email, first_name, last_name, profile_image_url)
-                  VALUES (
-                    ${email},
-                    ${firstName},
-                    ${lastName},
-                    ${imageUrl}
-                  )
-                  RETURNING id
+              if (e.code === "23505") {
+                // Sequence drift can collide on PK; re-sync and retry once.
+                if (e.constraint === "user_profiles_pkey") {
+                  await syncUserProfileIdSequence();
+                  try {
+                    return await sql`
+                      INSERT INTO user_profiles (email, first_name, last_name, profile_image_url)
+                      VALUES (
+                        ${email},
+                        ${firstName},
+                        ${lastName},
+                        ${imageUrl}
+                      )
+                      RETURNING id
+                    `;
+                  } catch {
+                    // fall through to lookup by email below
+                  }
+                }
+
+                // For races/unique conflicts, try resolving by email.
+                const [byEmail] = await sql`
+                  SELECT id
+                  FROM user_profiles
+                  WHERE LOWER(email) = LOWER(${email})
+                  LIMIT 1
                 `;
+                if (byEmail?.id) {
+                  return [{ id: byEmail.id }];
+                }
               }
               throw error;
             }
