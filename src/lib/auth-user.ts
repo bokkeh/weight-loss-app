@@ -117,7 +117,11 @@ export function ensureMultiUserSchema() {
 }
 
 export async function findUserIdByEmail(email: string): Promise<number | null> {
-  await ensureMultiUserSchema();
+  try {
+    await ensureMultiUserSchema();
+  } catch (error) {
+    console.error("findUserIdByEmail: ensureMultiUserSchema failed:", error);
+  }
   const [row] = await sql`
     SELECT id
     FROM user_profiles
@@ -144,7 +148,11 @@ export async function getOrCreateUserId(params: {
     providerAccountId = null,
   } = params;
 
-  await ensureMultiUserSchema();
+  try {
+    await ensureMultiUserSchema();
+  } catch (error) {
+    console.error("getOrCreateUserId: ensureMultiUserSchema failed:", error);
+  }
 
   if (provider && providerAccountId) {
     const [mapped] = await sql`
@@ -211,7 +219,11 @@ export async function recordLoginEvent(params: {
   provider?: string | null;
 }) {
   const { userId, email = null, provider = null } = params;
-  await ensureMultiUserSchema();
+  try {
+    await ensureMultiUserSchema();
+  } catch (error) {
+    console.error("recordLoginEvent: ensureMultiUserSchema failed:", error);
+  }
   await sql`
     INSERT INTO auth_login_events (user_id, email, provider)
     VALUES (${userId}, ${email}, ${provider})
