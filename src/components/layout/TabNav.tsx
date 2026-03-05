@@ -3,6 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   LayoutDashboard,
   Scale,
@@ -10,6 +18,7 @@ import {
   MessageCircle,
   BookOpen,
   User,
+  Menu,
 } from "lucide-react";
 
 const tabs = [
@@ -18,6 +27,12 @@ const tabs = [
   { href: "/food-log", label: "Food Log", icon: UtensilsCrossed },
   { href: "/chat", label: "AI Coach", icon: MessageCircle },
   { href: "/recipes", label: "Recipes", icon: BookOpen },
+];
+
+const profileTab = { href: "/profile", label: "Profile", icon: User };
+
+const desktopTabs = [
+  ...tabs,
   { href: "/profile", label: "Profile", icon: User },
 ];
 
@@ -32,7 +47,7 @@ export function TabNav() {
           <span className="text-lg font-bold text-primary">WeightTrack</span>
         </div>
         <div className="flex flex-col gap-1 p-3 flex-1">
-          {tabs.map(({ href, label, icon: Icon }) => {
+          {desktopTabs.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
             return (
               <Link
@@ -52,6 +67,43 @@ export function TabNav() {
           })}
         </div>
       </nav>
+
+      {/* Mobile: hamburger menu */}
+      <div className="md:hidden fixed top-3 right-3 z-[60]">
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shadow-sm bg-background/95">
+              <Menu className="h-4 w-4" />
+              <span className="sr-only">Open menu</span>
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-72">
+            <SheetHeader>
+              <SheetTitle>Menu</SheetTitle>
+            </SheetHeader>
+            <div className="mt-4 flex flex-col gap-1">
+              {[...tabs, profileTab].map(({ href, label, icon: Icon }) => {
+                const active = pathname === href || pathname.startsWith(href + "/");
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                      active
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    )}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    {label}
+                  </Link>
+                );
+              })}
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
 
       {/* Mobile: bottom bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t">
