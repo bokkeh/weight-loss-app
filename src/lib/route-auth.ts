@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
+import { getToken } from "next-auth/jwt";
 import { authOptions } from "@/lib/auth-options";
 import { ensureMultiUserSchema } from "@/lib/auth-user";
 import { getOrCreateUserId } from "@/lib/auth-user";
 import { findUserIdByEmail } from "@/lib/auth-user";
 import { isAdminEmail } from "@/lib/admin";
 
-export async function requireUserId() {
+export async function requireUserId(req?: Request) {
   try {
     await ensureMultiUserSchema();
   } catch (error) {
@@ -15,6 +17,33 @@ export async function requireUserId() {
   }
 
   try {
+    if (req) {
+      try {
+        const token = await getToken({
+          req: new NextRequest(req),
+          secret: process.env.NEXTAUTH_SECRET,
+        });
+        if (token?.userId) {
+          const parsedId = Number(token.userId);
+          if (Number.isFinite(parsedId) && parsedId > 0) {
+            return { userId: parsedId };
+          }
+        }
+
+        if (token?.email) {
+          const tokenEmail = String(token.email).trim();
+          if (tokenEmail) {
+            const existingUserId = await findUserIdByEmail(tokenEmail);
+            if (existingUserId) {
+              return { userId: existingUserId };
+            }
+          }
+        }
+      } catch (error) {
+        console.error("getToken fallback failed:", error);
+      }
+    }
+
     const session = await getServerSession(authOptions);
     const rawId = session?.user?.id;
     const parsedId = Number(rawId);

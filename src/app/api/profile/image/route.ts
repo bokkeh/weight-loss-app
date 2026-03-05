@@ -25,7 +25,7 @@ async function ensureProfileTable() {
 
 export async function POST(req: Request) {
   try {
-    const authState = await requireUserId();
+    const authState = await requireUserId(req);
     if ("response" in authState) return authState.response;
     const { userId } = authState;
 

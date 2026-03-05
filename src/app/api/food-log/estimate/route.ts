@@ -4,7 +4,7 @@ import { estimateMacros, estimateMacrosFromImage, estimateMacrosFromImages } fro
 import { requireUserId } from "@/lib/route-auth";
 
 export async function POST(req: Request) {
-  const authState = await requireUserId();
+  const authState = await requireUserId(req);
   if ("response" in authState) return authState.response;
   const { userId } = authState;
 

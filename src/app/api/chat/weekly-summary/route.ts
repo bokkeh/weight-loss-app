@@ -8,8 +8,8 @@ function getClient() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 }
 
-export async function GET() {
-  const authState = await requireUserId();
+export async function GET(req: Request) {
+  const authState = await requireUserId(req);
   if ("response" in authState) return authState.response;
   const { userId } = authState;
 

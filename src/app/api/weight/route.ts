@@ -3,7 +3,7 @@ import sql from "@/lib/db";
 import { requireUserId } from "@/lib/route-auth";
 
 export async function GET(req: Request) {
-  const authState = await requireUserId();
+  const authState = await requireUserId(req);
   if ("response" in authState) return authState.response;
   const { userId } = authState;
 
@@ -25,7 +25,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const authState = await requireUserId();
+  const authState = await requireUserId(req);
   if ("response" in authState) return authState.response;
   const { userId } = authState;
 

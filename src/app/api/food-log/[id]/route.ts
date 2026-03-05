@@ -7,7 +7,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const authState = await requireUserId();
+  const authState = await requireUserId(req);
   if ("response" in authState) return authState.response;
   const { userId } = authState;
 
@@ -43,7 +43,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const authState = await requireUserId();
+  const authState = await requireUserId(_req);
   if ("response" in authState) return authState.response;
   const { userId } = authState;
 

@@ -5,7 +5,7 @@ import { requireUserId } from "@/lib/route-auth";
 
 // GET /api/water?date=YYYY-MM-DD  → today's entries
 export async function GET(req: Request) {
-  const authState = await requireUserId();
+  const authState = await requireUserId(req);
   if ("response" in authState) return authState.response;
   const { userId } = authState;
 
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
 
 // POST /api/water  → add 8 oz glass
 export async function POST(req: Request) {
-  const authState = await requireUserId();
+  const authState = await requireUserId(req);
   if ("response" in authState) return authState.response;
   const { userId } = authState;
 
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
 
 // DELETE /api/water?id=123  → delete a specific entry (undo)
 export async function DELETE(req: Request) {
-  const authState = await requireUserId();
+  const authState = await requireUserId(req);
   if ("response" in authState) return authState.response;
   const { userId } = authState;
 

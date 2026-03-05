@@ -9,7 +9,7 @@ export async function POST(
 ) {
   const { id } = await params;
   const recipeId = Number(id);
-  const authState = await requireUserId();
+  const authState = await requireUserId(req);
   if ("response" in authState) return authState.response;
   const { userId } = authState;
 

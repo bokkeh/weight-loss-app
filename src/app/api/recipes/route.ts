@@ -32,7 +32,7 @@ async function ensureRecipesTable() {
 
 export async function GET(req: Request) {
   try {
-    const authState = await requireUserId();
+    const authState = await requireUserId(req);
     if ("response" in authState) return authState.response;
     const { userId } = authState;
     const { searchParams } = new URL(req.url);
@@ -68,7 +68,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const authState = await requireUserId();
+    const authState = await requireUserId(req);
     if ("response" in authState) return authState.response;
     const { userId } = authState;
     await ensureRecipesTable();

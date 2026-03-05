@@ -22,9 +22,9 @@ async function ensureProfileTable() {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const authState = await requireUserId();
+    const authState = await requireUserId(req);
     if ("response" in authState) return authState.response;
     const { userId } = authState;
 
@@ -50,7 +50,7 @@ export async function GET() {
 
 export async function PUT(req: Request) {
   try {
-    const authState = await requireUserId();
+    const authState = await requireUserId(req);
     if ("response" in authState) return authState.response;
     const { userId } = authState;
 

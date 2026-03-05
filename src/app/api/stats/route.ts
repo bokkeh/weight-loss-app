@@ -10,7 +10,7 @@ function shiftDay(dayStr: string, offset: number): string {
 }
 
 export async function GET(req: Request) {
-  const authState = await requireUserId();
+  const authState = await requireUserId(req);
   if ("response" in authState) return authState.response;
   const { userId } = authState;
 

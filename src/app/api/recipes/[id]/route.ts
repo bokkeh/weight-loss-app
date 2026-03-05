@@ -7,7 +7,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Params) {
   const { id } = await params;
-  const authState = await requireUserId();
+  const authState = await requireUserId(_req);
   if ("response" in authState) return authState.response;
   const { userId } = authState;
 
@@ -31,7 +31,7 @@ export async function GET(_req: Request, { params }: Params) {
 
 export async function PUT(req: Request, { params }: Params) {
   const { id } = await params;
-  const authState = await requireUserId();
+  const authState = await requireUserId(req);
   if ("response" in authState) return authState.response;
   const { userId } = authState;
 
@@ -84,7 +84,7 @@ export async function PUT(req: Request, { params }: Params) {
 
 export async function DELETE(_req: Request, { params }: Params) {
   const { id } = await params;
-  const authState = await requireUserId();
+  const authState = await requireUserId(_req);
   if ("response" in authState) return authState.response;
   const { userId } = authState;
 
