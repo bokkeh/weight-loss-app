@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { uploadRecipeImage, deleteRecipeImage } from "@/lib/blob";
+import { requireUserId } from "@/lib/route-auth";
 
 export async function POST(
   req: Request,
@@ -8,6 +9,9 @@ export async function POST(
 ) {
   const { id } = await params;
   const recipeId = Number(id);
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
 
   try {
     const formData = await req.formData();
@@ -18,7 +22,10 @@ export async function POST(
     }
 
     const [existing] = await sql`
-      SELECT image_url FROM recipes WHERE id = ${recipeId}
+      SELECT image_url
+      FROM recipes
+      WHERE id = ${recipeId}
+        AND user_id = ${userId}
     `;
     if (!existing) {
       return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
@@ -31,7 +38,10 @@ export async function POST(
     const imageUrl = await uploadRecipeImage(recipeId, file);
 
     await sql`
-      UPDATE recipes SET image_url = ${imageUrl} WHERE id = ${recipeId}
+      UPDATE recipes
+      SET image_url = ${imageUrl}
+      WHERE id = ${recipeId}
+        AND user_id = ${userId}
     `;
 
     return NextResponse.json({ image_url: imageUrl });

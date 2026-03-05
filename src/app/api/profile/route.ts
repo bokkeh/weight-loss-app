@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { requireUserId } from "@/lib/route-auth";
 
 async function ensureProfileTable() {
   await sql`
     CREATE TABLE IF NOT EXISTS user_profiles (
-      id                    INTEGER PRIMARY KEY DEFAULT 1,
+      id                    SERIAL PRIMARY KEY,
       first_name            TEXT,
       last_name             TEXT,
       email                 TEXT,
@@ -18,19 +19,23 @@ async function ensureProfileTable() {
 }
 
 export async function GET() {
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   try {
     await ensureProfileTable();
     const [profile] = await sql`
       SELECT id, first_name, last_name, email, phone, profile_image_url, dietary_restrictions, created_at::text, updated_at::text
       FROM user_profiles
-      WHERE id = 1
+      WHERE id = ${userId}
       LIMIT 1
     `;
     if (profile) return NextResponse.json(profile);
 
     const [created] = await sql`
       INSERT INTO user_profiles (id)
-      VALUES (1)
+      VALUES (${userId})
       RETURNING id, first_name, last_name, email, phone, profile_image_url, dietary_restrictions, created_at::text, updated_at::text
     `;
     return NextResponse.json(created);
@@ -40,6 +45,10 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   try {
     await ensureProfileTable();
     const body = await req.json().catch(() => ({}));
@@ -59,7 +68,7 @@ export async function PUT(req: Request) {
     const [profile] = await sql`
       INSERT INTO user_profiles (id, first_name, last_name, email, phone, dietary_restrictions, profile_image_url)
       VALUES (
-        1,
+        ${userId},
         ${first_name ? String(first_name).trim() : null},
         ${last_name ? String(last_name).trim() : null},
         ${email ? String(email).trim() : null},

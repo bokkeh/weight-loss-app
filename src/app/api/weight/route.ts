@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { requireUserId } from "@/lib/route-auth";
 
 export async function GET(req: Request) {
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   const { searchParams } = new URL(req.url);
   const weeks = parseInt(searchParams.get("weeks") ?? "12", 10);
 
@@ -9,7 +14,8 @@ export async function GET(req: Request) {
     const entries = await sql`
       SELECT id, logged_at::text, weight_lbs::float, time_of_day, note, created_at::text
       FROM weight_entries
-      WHERE logged_at >= CURRENT_DATE - (${weeks} * INTERVAL '1 week')
+      WHERE user_id = ${userId}
+        AND logged_at >= CURRENT_DATE - (${weeks} * INTERVAL '1 week')
       ORDER BY logged_at DESC, created_at ASC
     `;
     return NextResponse.json(entries);
@@ -19,6 +25,10 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   try {
     const body = await req.json();
     const { logged_at, weight_lbs, time_of_day, note } = body;
@@ -28,8 +38,9 @@ export async function POST(req: Request) {
     }
 
     const [entry] = await sql`
-      INSERT INTO weight_entries (logged_at, weight_lbs, time_of_day, note)
+      INSERT INTO weight_entries (user_id, logged_at, weight_lbs, time_of_day, note)
       VALUES (
+        ${userId},
         ${logged_at ?? new Date().toISOString().split("T")[0]},
         ${Number(weight_lbs)},
         ${time_of_day ?? null},

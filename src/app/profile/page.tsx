@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { UserProfile } from "@/types";
+import { signOut } from "next-auth/react";
 
 interface ProfileForm {
   first_name: string;
@@ -176,10 +177,16 @@ export default function ProfilePage() {
             <Button type="submit" disabled={saving}>
               {saving ? "Saving..." : "Save Profile"}
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => signOut({ callbackUrl: "/signin" })}
+            >
+              Sign out
+            </Button>
           </form>
         </CardContent>
       </Card>
     </div>
   );
 }
-

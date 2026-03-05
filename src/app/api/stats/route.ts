@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { requireUserId } from "@/lib/route-auth";
 
 function shiftDay(dayStr: string, offset: number): string {
   const [y, m, d] = dayStr.split("-").map(Number);
@@ -9,6 +10,10 @@ function shiftDay(dayStr: string, offset: number): string {
 }
 
 export async function GET(req: Request) {
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   try {
     const { searchParams } = new URL(req.url);
     // Client passes its local date so streak is correct regardless of server timezone
@@ -19,8 +24,10 @@ export async function GET(req: Request) {
       SELECT DISTINCT logged_at::date::text AS day
       FROM (
         SELECT logged_at FROM weight_entries
+        WHERE user_id = ${userId}
         UNION ALL
         SELECT logged_at FROM food_log_entries
+        WHERE user_id = ${userId}
       ) combined
       WHERE logged_at >= CURRENT_DATE - INTERVAL '90 days'
       ORDER BY day DESC
@@ -52,7 +59,8 @@ export async function GET(req: Request) {
         logged_at::date AS day,
         SUM(calories) AS total
       FROM food_log_entries
-      WHERE logged_at >= ${sevenDaysAgoStr}::date
+      WHERE user_id = ${userId}
+        AND logged_at >= ${sevenDaysAgoStr}::date
       GROUP BY logged_at::date
     `;
     const weeklyAvgCalories =

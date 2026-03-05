@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import OpenAI from "openai";
+import { requireUserId } from "@/lib/route-auth";
 
 function getClient() {
   if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY not set");
@@ -8,12 +9,17 @@ function getClient() {
 }
 
 export async function GET() {
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   try {
     const [weightRows, foodRows] = await Promise.all([
       sql`
         SELECT logged_at::date AS day, weight_lbs::float
         FROM weight_entries
-        WHERE logged_at >= CURRENT_DATE - INTERVAL '7 days'
+        WHERE user_id = ${userId}
+          AND logged_at >= CURRENT_DATE - INTERVAL '7 days'
         ORDER BY logged_at ASC
       `,
       sql`
@@ -23,7 +29,8 @@ export async function GET() {
                SUM(carbs_g)::float AS carbs_g,
                SUM(fat_g)::float AS fat_g
         FROM food_log_entries
-        WHERE logged_at >= CURRENT_DATE - INTERVAL '7 days'
+        WHERE user_id = ${userId}
+          AND logged_at >= CURRENT_DATE - INTERVAL '7 days'
         GROUP BY logged_at::date
         ORDER BY day ASC
       `,

@@ -11,6 +11,7 @@ export async function POST(req: Request) {
     await sql`
       CREATE TABLE IF NOT EXISTS weight_entries (
         id          SERIAL PRIMARY KEY,
+        user_id     INTEGER       NOT NULL DEFAULT 1,
         logged_at   DATE          NOT NULL DEFAULT CURRENT_DATE,
         weight_lbs  NUMERIC(6,2)  NOT NULL CHECK (weight_lbs > 0),
         note        TEXT,
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
     await sql`
       CREATE TABLE IF NOT EXISTS recipes (
         id           SERIAL PRIMARY KEY,
+        user_id      INTEGER       NOT NULL DEFAULT 1,
         name         TEXT          NOT NULL,
         description  TEXT,
         servings     INTEGER       NOT NULL DEFAULT 1,
@@ -53,6 +55,7 @@ export async function POST(req: Request) {
     await sql`
       CREATE TABLE IF NOT EXISTS food_log_entries (
         id           SERIAL PRIMARY KEY,
+        user_id      INTEGER       NOT NULL DEFAULT 1,
         logged_at    DATE          NOT NULL DEFAULT CURRENT_DATE,
         meal_type    TEXT          CHECK (meal_type IN ('breakfast','lunch','dinner','snack')),
         food_name    TEXT          NOT NULL,
@@ -82,6 +85,7 @@ export async function POST(req: Request) {
     await sql`
       CREATE TABLE IF NOT EXISTS chat_messages (
         id           SERIAL PRIMARY KEY,
+        user_id      INTEGER       NOT NULL DEFAULT 1,
         role         TEXT          NOT NULL CHECK (role IN ('user','model')),
         content      TEXT          NOT NULL,
         food_log_id  INTEGER       REFERENCES food_log_entries(id) ON DELETE SET NULL,
@@ -91,7 +95,7 @@ export async function POST(req: Request) {
 
     await sql`
       CREATE TABLE IF NOT EXISTS user_profiles (
-        id                    INTEGER PRIMARY KEY DEFAULT 1,
+        id                    SERIAL PRIMARY KEY,
         first_name            TEXT,
         last_name             TEXT,
         email                 TEXT,
@@ -113,6 +117,7 @@ export async function POST(req: Request) {
     await sql`
       CREATE TABLE IF NOT EXISTS water_log_entries (
         id         SERIAL PRIMARY KEY,
+        user_id    INTEGER       NOT NULL DEFAULT 1,
         logged_at  DATE          NOT NULL DEFAULT CURRENT_DATE,
         ounces     NUMERIC(5,1)  NOT NULL DEFAULT 8,
         source     TEXT          NOT NULL DEFAULT 'sodium_widget',
@@ -121,9 +126,38 @@ export async function POST(req: Request) {
     `;
 
     await sql`
+      CREATE TABLE IF NOT EXISTS auth_accounts (
+        id                  SERIAL PRIMARY KEY,
+        provider            TEXT NOT NULL,
+        provider_account_id TEXT NOT NULL,
+        user_id             INTEGER NOT NULL,
+        created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(provider, provider_account_id)
+      )
+    `;
+
+    await sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_user_profiles_email_unique
+        ON user_profiles (LOWER(email))
+        WHERE email IS NOT NULL
+    `;
+
+    await sql`
       CREATE INDEX IF NOT EXISTS idx_water_log_logged_at
         ON water_log_entries (logged_at DESC)
     `;
+
+    await sql`ALTER TABLE weight_entries ADD COLUMN IF NOT EXISTS user_id INTEGER NOT NULL DEFAULT 1`;
+    await sql`ALTER TABLE recipes ADD COLUMN IF NOT EXISTS user_id INTEGER NOT NULL DEFAULT 1`;
+    await sql`ALTER TABLE food_log_entries ADD COLUMN IF NOT EXISTS user_id INTEGER NOT NULL DEFAULT 1`;
+    await sql`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS user_id INTEGER NOT NULL DEFAULT 1`;
+    await sql`ALTER TABLE water_log_entries ADD COLUMN IF NOT EXISTS user_id INTEGER NOT NULL DEFAULT 1`;
+
+    await sql`CREATE INDEX IF NOT EXISTS idx_weight_entries_user_id ON weight_entries (user_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_recipes_user_id ON recipes (user_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_food_log_entries_user_id ON food_log_entries (user_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_chat_messages_user_id ON chat_messages (user_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_water_log_entries_user_id ON water_log_entries (user_id)`;
 
     await sql`
       CREATE OR REPLACE FUNCTION update_updated_at_column()

@@ -42,6 +42,9 @@ const desktopTabs = [
 export function TabNav() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  if (pathname.startsWith("/signin")) {
+    return null;
+  }
   const closeMenu = () => setMenuOpen(false);
 
   function downloadCSV(filename: string, rows: string[][]) {

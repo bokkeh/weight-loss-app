@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { requireUserId } from "@/lib/route-auth";
 import {
   sendChatMessage,
   parseFoodLogBlock,
@@ -7,10 +8,15 @@ import {
 } from "@/lib/gemini";
 
 export async function GET() {
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   try {
     const messages = await sql`
       SELECT id, role, content, food_log_id, created_at::text
       FROM chat_messages
+      WHERE user_id = ${userId}
       ORDER BY created_at ASC
       LIMIT 100
     `;
@@ -21,6 +27,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   try {
     const body = await req.json();
     const { message } = body as { message: string };
@@ -33,6 +43,7 @@ export async function POST(req: Request) {
     const history = await sql`
       SELECT role, content
       FROM chat_messages
+      WHERE user_id = ${userId}
       ORDER BY created_at ASC
       LIMIT 40
     `;
@@ -43,7 +54,8 @@ export async function POST(req: Request) {
       SELECT food_name, serving_size, calories::float, protein_g::float,
              carbs_g::float, fat_g::float, meal_type
       FROM food_log_entries
-      WHERE logged_at = ${today}
+      WHERE user_id = ${userId}
+        AND logged_at = ${today}
       ORDER BY created_at ASC
     `;
 
@@ -51,7 +63,8 @@ export async function POST(req: Request) {
     const recentWeight = await sql`
       SELECT logged_at::text, weight_lbs::float, time_of_day
       FROM weight_entries
-      WHERE logged_at >= CURRENT_DATE - INTERVAL '14 days'
+      WHERE user_id = ${userId}
+        AND logged_at >= CURRENT_DATE - INTERVAL '14 days'
       ORDER BY logged_at DESC, created_at ASC
       LIMIT 20
     `;
@@ -98,8 +111,9 @@ export async function POST(req: Request) {
       const today = new Date().toISOString().split("T")[0];
       const [entry] = await sql`
         INSERT INTO food_log_entries
-          (logged_at, meal_type, food_name, serving_size, calories, protein_g, carbs_g, fat_g, fiber_g, sodium_mg, source)
+          (user_id, logged_at, meal_type, food_name, serving_size, calories, protein_g, carbs_g, fat_g, fiber_g, sodium_mg, source)
         VALUES (
+          ${userId},
           ${today},
           ${foodPayload.meal_type},
           ${foodPayload.food_name},
@@ -120,23 +134,23 @@ export async function POST(req: Request) {
 
       // Save user message
       await sql`
-        INSERT INTO chat_messages (role, content) VALUES ('user', ${message})
+        INSERT INTO chat_messages (user_id, role, content) VALUES (${userId}, 'user', ${message})
       `;
 
       // Save model response linked to food log
       await sql`
-        INSERT INTO chat_messages (role, content, food_log_id)
-        VALUES ('model', ${cleanReply}, ${entry.id})
+        INSERT INTO chat_messages (user_id, role, content, food_log_id)
+        VALUES (${userId}, 'model', ${cleanReply}, ${entry.id})
       `;
     } else {
       // Save user message
       await sql`
-        INSERT INTO chat_messages (role, content) VALUES ('user', ${message})
+        INSERT INTO chat_messages (user_id, role, content) VALUES (${userId}, 'user', ${message})
       `;
 
       // Save model response
       await sql`
-        INSERT INTO chat_messages (role, content) VALUES ('model', ${cleanReply})
+        INSERT INTO chat_messages (user_id, role, content) VALUES (${userId}, 'model', ${cleanReply})
       `;
     }
 
@@ -151,8 +165,12 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE() {
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   try {
-    await sql`DELETE FROM chat_messages`;
+    await sql`DELETE FROM chat_messages WHERE user_id = ${userId}`;
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });

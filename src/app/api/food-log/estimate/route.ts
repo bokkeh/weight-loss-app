@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { estimateMacros, estimateMacrosFromImage } from "@/lib/gemini";
+import { requireUserId } from "@/lib/route-auth";
 
 export async function POST(req: Request) {
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   try {
     const { text, imageBase64, mimeType, logged_at } = await req.json();
     if (!text?.trim() && !imageBase64) {
@@ -15,8 +20,9 @@ export async function POST(req: Request) {
 
     const [entry] = await sql`
       INSERT INTO food_log_entries
-        (logged_at, meal_type, food_name, serving_size, calories, protein_g, carbs_g, fat_g, fiber_g, sodium_mg, source)
+        (user_id, logged_at, meal_type, food_name, serving_size, calories, protein_g, carbs_g, fat_g, fiber_g, sodium_mg, source)
       VALUES (
+        ${userId},
         ${logged_at ?? new Date().toISOString().split("T")[0]},
         ${macros.meal_type},
         ${macros.food_name},

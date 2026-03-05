@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { TabNav } from "@/components/layout/TabNav";
 import { PullToRefresh } from "@/components/layout/PullToRefresh";
@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "WeightTrack — Your Personal Weight Loss Tracker",
+  title: "WeightTrack - Your Personal Weight Loss Tracker",
   description: "Track your weight, log food, chat with an AI coach, and store your favorite recipes.",
 };
 
@@ -41,3 +41,4 @@ export default function RootLayout({
     </html>
   );
 }
+

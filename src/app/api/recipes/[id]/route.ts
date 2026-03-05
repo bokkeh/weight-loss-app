@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { deleteRecipeImage } from "@/lib/blob";
+import { requireUserId } from "@/lib/route-auth";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Params) {
   const { id } = await params;
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   try {
     const [recipe] = await sql`
       SELECT id, name, description, servings,
@@ -13,6 +18,7 @@ export async function GET(_req: Request, { params }: Params) {
              ingredients, instructions, image_url, tags, created_at::text, updated_at::text
       FROM recipes
       WHERE id = ${Number(id)}
+        AND user_id = ${userId}
     `;
     if (!recipe) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -25,6 +31,10 @@ export async function GET(_req: Request, { params }: Params) {
 
 export async function PUT(req: Request, { params }: Params) {
   const { id } = await params;
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   try {
     const body = await req.json();
     const {
@@ -57,6 +67,7 @@ export async function PUT(req: Request, { params }: Params) {
         image_url    = COALESCE(${image_url ?? null}, image_url),
         tags         = COALESCE(${tags ?? null}, tags)
       WHERE id = ${Number(id)}
+        AND user_id = ${userId}
       RETURNING id, name, description, servings,
                 calories::float, protein_g::float, carbs_g::float, fat_g::float, fiber_g::float,
                 ingredients, instructions, image_url, tags, created_at::text, updated_at::text
@@ -73,9 +84,16 @@ export async function PUT(req: Request, { params }: Params) {
 
 export async function DELETE(_req: Request, { params }: Params) {
   const { id } = await params;
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   try {
     const [existing] = await sql`
-      SELECT image_url FROM recipes WHERE id = ${Number(id)}
+      SELECT image_url
+      FROM recipes
+      WHERE id = ${Number(id)}
+        AND user_id = ${userId}
     `;
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -85,7 +103,7 @@ export async function DELETE(_req: Request, { params }: Params) {
       await deleteRecipeImage(existing.image_url as string);
     }
 
-    await sql`DELETE FROM recipes WHERE id = ${Number(id)}`;
+    await sql`DELETE FROM recipes WHERE id = ${Number(id)} AND user_id = ${userId}`;
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });

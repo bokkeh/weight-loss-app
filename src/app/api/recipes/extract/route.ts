@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { requireUserId } from "@/lib/route-auth";
 
 function getClient() {
   if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY not set");
@@ -43,6 +44,9 @@ function htmlToText(html: string): string {
 }
 
 export async function POST(req: Request) {
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+
   try {
     const { url } = await req.json();
     if (!url?.trim()) return NextResponse.json({ error: "url is required" }, { status: 400 });

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { uploadProfileImage, deleteProfileImage } from "@/lib/blob";
+import { requireUserId } from "@/lib/route-auth";
 
 async function ensureProfileTable() {
   await sql`
     CREATE TABLE IF NOT EXISTS user_profiles (
-      id                    INTEGER PRIMARY KEY DEFAULT 1,
+      id                    SERIAL PRIMARY KEY,
       first_name            TEXT,
       last_name             TEXT,
       email                 TEXT,
@@ -19,6 +20,10 @@ async function ensureProfileTable() {
 }
 
 export async function POST(req: Request) {
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   try {
     await ensureProfileTable();
     const formData = await req.formData();
@@ -30,12 +35,12 @@ export async function POST(req: Request) {
     const [existing] = await sql`
       SELECT profile_image_url
       FROM user_profiles
-      WHERE id = 1
+      WHERE id = ${userId}
       LIMIT 1
     `;
 
     if (!existing) {
-      await sql`INSERT INTO user_profiles (id) VALUES (1) ON CONFLICT (id) DO NOTHING`;
+      await sql`INSERT INTO user_profiles (id) VALUES (${userId}) ON CONFLICT (id) DO NOTHING`;
     }
 
     if (existing?.profile_image_url) {
@@ -46,7 +51,7 @@ export async function POST(req: Request) {
     await sql`
       UPDATE user_profiles
       SET profile_image_url = ${imageUrl}
-      WHERE id = 1
+      WHERE id = ${userId}
     `;
 
     return NextResponse.json({ profile_image_url: imageUrl });

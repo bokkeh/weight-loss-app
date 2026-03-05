@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { requireUserId } from "@/lib/route-auth";
 
 export async function GET(req: Request) {
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   const { searchParams } = new URL(req.url);
   const date = searchParams.get("date");
   const weeks = parseInt(searchParams.get("weeks") ?? "1", 10);
@@ -14,7 +19,8 @@ export async function GET(req: Request) {
                calories::float, protein_g::float, carbs_g::float,
                fat_g::float, fiber_g::float, sodium_mg::float, source, recipe_id, created_at::text
         FROM food_log_entries
-        WHERE logged_at = ${date}
+        WHERE user_id = ${userId}
+          AND logged_at = ${date}
         ORDER BY created_at ASC
       `;
     } else {
@@ -23,7 +29,8 @@ export async function GET(req: Request) {
                calories::float, protein_g::float, carbs_g::float,
                fat_g::float, fiber_g::float, sodium_mg::float, source, recipe_id, created_at::text
         FROM food_log_entries
-        WHERE logged_at >= CURRENT_DATE - (${weeks} * INTERVAL '1 week')
+        WHERE user_id = ${userId}
+          AND logged_at >= CURRENT_DATE - (${weeks} * INTERVAL '1 week')
         ORDER BY logged_at DESC, created_at ASC
       `;
     }
@@ -34,6 +41,10 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   try {
     const body = await req.json();
     const {
@@ -57,8 +68,9 @@ export async function POST(req: Request) {
 
     const [entry] = await sql`
       INSERT INTO food_log_entries
-        (logged_at, meal_type, food_name, serving_size, calories, protein_g, carbs_g, fat_g, fiber_g, sodium_mg, source, recipe_id)
+        (user_id, logged_at, meal_type, food_name, serving_size, calories, protein_g, carbs_g, fat_g, fiber_g, sodium_mg, source, recipe_id)
       VALUES (
+        ${userId},
         ${logged_at ?? new Date().toISOString().split("T")[0]},
         ${meal_type ?? null},
         ${food_name},

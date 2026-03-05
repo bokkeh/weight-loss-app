@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { requireUserId } from "@/lib/route-auth";
 
 export async function GET(req: Request) {
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   const { searchParams } = new URL(req.url);
   const tag = searchParams.get("tag");
 
@@ -13,7 +18,8 @@ export async function GET(req: Request) {
                calories::float, protein_g::float, carbs_g::float, fat_g::float, fiber_g::float,
                ingredients, instructions, image_url, tags, created_at::text, updated_at::text
         FROM recipes
-        WHERE ${tag} = ANY(tags)
+        WHERE user_id = ${userId}
+          AND ${tag} = ANY(tags)
         ORDER BY created_at DESC
       `;
     } else {
@@ -22,6 +28,7 @@ export async function GET(req: Request) {
                calories::float, protein_g::float, carbs_g::float, fat_g::float, fiber_g::float,
                ingredients, instructions, image_url, tags, created_at::text, updated_at::text
         FROM recipes
+        WHERE user_id = ${userId}
         ORDER BY created_at DESC
       `;
     }
@@ -32,6 +39,10 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+  const { userId } = authState;
+
   try {
     const body = await req.json();
     const {
@@ -55,8 +66,9 @@ export async function POST(req: Request) {
 
     const [recipe] = await sql`
       INSERT INTO recipes
-        (name, description, servings, calories, protein_g, carbs_g, fat_g, fiber_g, ingredients, instructions, image_url, tags)
+        (user_id, name, description, servings, calories, protein_g, carbs_g, fat_g, fiber_g, ingredients, instructions, image_url, tags)
       VALUES (
+        ${userId},
         ${name},
         ${description ?? null},
         ${Number(servings)},

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { requireUserId } from "@/lib/route-auth";
 
 let client: OpenAI | null = null;
 function getClient() {
@@ -8,6 +9,9 @@ function getClient() {
 }
 
 export async function POST(req: Request) {
+  const authState = await requireUserId();
+  if ("response" in authState) return authState.response;
+
   try {
     const { preferences } = await req.json();
 
