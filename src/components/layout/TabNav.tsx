@@ -108,7 +108,7 @@ export function TabNav() {
       </nav>
 
       {/* Mobile: hamburger menu */}
-      <div className="md:hidden fixed top-1 left-3 z-[60]">
+      <div className="md:hidden fixed top-1 left-3 z-40">
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
           <SheetTrigger asChild>
             <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shadow-sm bg-background/95">
@@ -116,7 +116,7 @@ export function TabNav() {
               <span className="sr-only">Open menu</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-72">
+          <SheetContent side="left" className="w-screen max-w-none sm:max-w-none">
             <SheetHeader>
               <SheetTitle>Menu</SheetTitle>
             </SheetHeader>
