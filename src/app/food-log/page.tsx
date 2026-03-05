@@ -210,6 +210,65 @@ function buildMealIdeas(todayEntries: FoodLogEntry[], recentEntries: FoodLogEntr
   return ideas.slice(0, 5);
 }
 
+interface FrequentFood {
+  key: string;
+  food_name: string;
+  serving_size: string | null;
+  meal_type: FoodLogEntry["meal_type"];
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g: number;
+  sodium_mg: number;
+  count: number;
+  lastLoggedAt: string;
+}
+
+function buildFrequentFoods(entries: FoodLogEntry[]): FrequentFood[] {
+  const groups = new Map<string, FrequentFood>();
+  for (const entry of entries) {
+    const key = `${entry.food_name.trim().toLowerCase()}|${(entry.serving_size ?? "").trim().toLowerCase()}`;
+    const existing = groups.get(key);
+    const currentTs = getEntryTimestamp(entry);
+    if (!existing) {
+      groups.set(key, {
+        key,
+        food_name: entry.food_name,
+        serving_size: entry.serving_size ?? null,
+        meal_type: entry.meal_type ?? "snack",
+        calories: Number(entry.calories),
+        protein_g: Number(entry.protein_g),
+        carbs_g: Number(entry.carbs_g),
+        fat_g: Number(entry.fat_g),
+        fiber_g: Number(entry.fiber_g),
+        sodium_mg: Number(entry.sodium_mg),
+        count: 1,
+        lastLoggedAt: entry.created_at,
+      });
+      continue;
+    }
+    existing.count += 1;
+    const existingTs = new Date(existing.lastLoggedAt).getTime();
+    if (currentTs >= existingTs) {
+      existing.meal_type = entry.meal_type ?? existing.meal_type;
+      existing.calories = Number(entry.calories);
+      existing.protein_g = Number(entry.protein_g);
+      existing.carbs_g = Number(entry.carbs_g);
+      existing.fat_g = Number(entry.fat_g);
+      existing.fiber_g = Number(entry.fiber_g);
+      existing.sodium_mg = Number(entry.sodium_mg);
+      existing.lastLoggedAt = entry.created_at;
+    }
+  }
+  return [...groups.values()]
+    .sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return new Date(b.lastLoggedAt).getTime() - new Date(a.lastLoggedAt).getTime();
+    })
+    .slice(0, 8);
+}
+
 async function buildGoalsSnapshotImage(totals: DailyMacroTotals, date: Date): Promise<File> {
   const width = 1080;
   const height = 1320;
@@ -287,6 +346,7 @@ export default function FoodLogPage() {
   const [shareLabel, setShareLabel] = useState<"share" | "done">("share");
   const [goalsShareLabel, setGoalsShareLabel] = useState<"share" | "done">("share");
   const [mealIdeaIndex, setMealIdeaIndex] = useState(0);
+  const [quickAddingKey, setQuickAddingKey] = useState<string | null>(null);
 
   const today = new Date();
   const isToday = toDateStr(selectedDate) === toDateStr(today);
@@ -361,9 +421,42 @@ export default function FoodLogPage() {
     setTimeout(() => setGoalsShareLabel("share"), 2000);
   }
 
+  async function handleQuickAddFrequent(item: FrequentFood) {
+    const todayStr = toDateStr(new Date());
+    setQuickAddingKey(item.key);
+    try {
+      const res = await fetch("/api/food-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          logged_at: todayStr,
+          meal_type: item.meal_type ?? "snack",
+          food_name: item.food_name,
+          serving_size: item.serving_size ?? null,
+          calories: item.calories,
+          protein_g: item.protein_g,
+          carbs_g: item.carbs_g,
+          fat_g: item.fat_g,
+          fiber_g: item.fiber_g,
+          sodium_mg: item.sodium_mg,
+          source: "manual",
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const added: FoodLogEntry = await res.json();
+      setRecentEntries((prev) => [added, ...prev]);
+      if (toDateStr(selectedDate) === todayStr) {
+        setEntries((prev) => [...prev, added]);
+      }
+    } finally {
+      setQuickAddingKey(null);
+    }
+  }
+
   const totals = sumMacros(entries);
   const mealIdeas = buildMealIdeas(entries, recentEntries);
   const currentMealIdea = mealIdeas[Math.min(mealIdeaIndex, Math.max(0, mealIdeas.length - 1))] ?? "";
+  const frequentFoods = buildFrequentFoods(recentEntries);
 
   useEffect(() => {
     setMealIdeaIndex(0);
@@ -393,6 +486,38 @@ export default function FoodLogPage() {
 
       {/* Quick Log */}
       <QuickLogBar date={toDateStr(selectedDate)} onAdded={handleAdded} />
+
+      {!loading && frequentFoods.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Frequently Logged</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {frequentFoods.map((item) => (
+                <div key={item.key} className="shrink-0 rounded-lg border px-3 py-2 min-w-52 bg-background">
+                  <p className="text-sm font-medium leading-snug truncate">{item.food_name}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {item.serving_size ? `${item.serving_size} • ` : ""}
+                    {item.count}x logged
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {item.calories.toFixed(0)} cal • {item.protein_g.toFixed(0)}g P
+                  </p>
+                  <Button
+                    size="sm"
+                    className="mt-2 h-7 text-xs"
+                    disabled={quickAddingKey === item.key}
+                    onClick={() => handleQuickAddFrequent(item)}
+                  >
+                    {quickAddingKey === item.key ? "Adding..." : "Quick Add Today"}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Date Navigator */}
       <div className="flex items-center justify-center gap-4">

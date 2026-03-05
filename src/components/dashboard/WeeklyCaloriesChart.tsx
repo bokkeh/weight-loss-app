@@ -46,7 +46,7 @@ export function WeeklyCaloriesChart({ entries, calorieGoal = 2000 }: Props) {
         <Tooltip
           formatter={(v) => [`${v} kcal`, "Calories"]}
           wrapperStyle={{ zIndex: 50 }}
-          contentStyle={{ borderRadius: "8px", fontSize: "12px", backgroundColor: "hsl(var(--popover))", borderColor: "hsl(var(--border))", color: "hsl(var(--popover-foreground))" }}
+          contentStyle={{ borderRadius: "8px", fontSize: "12px", backgroundColor: "#ffffff", borderColor: "#e5e7eb", color: "#111827" }}
         />
         <ReferenceLine y={calorieGoal} stroke="#f59e0b" strokeDasharray="4 4" />
         <Bar dataKey="calories" fill="#f97316" radius={[3, 3, 0, 0]} />

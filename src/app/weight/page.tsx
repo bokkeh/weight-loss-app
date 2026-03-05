@@ -17,7 +17,60 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { WeightEntry } from "@/types";
 import { shareOrCopy } from "@/lib/shareUtils";
-import { Share2, Check } from "lucide-react";
+import { Share2, Check, TrendingUp } from "lucide-react";
+
+function estimateGoalPace(entries: WeightEntry[], goalWeight: number | null): { text: string; subtext: string } | null {
+  if (!goalWeight || entries.length < 3) return null;
+
+  const grouped = new Map<string, { total: number; count: number }>();
+  for (const e of entries) {
+    const key = String(e.logged_at).slice(0, 10);
+    const curr = grouped.get(key) ?? { total: 0, count: 0 };
+    curr.total += Number(e.weight_lbs);
+    curr.count += 1;
+    grouped.set(key, curr);
+  }
+
+  const daily = [...grouped.entries()]
+    .map(([date, v]) => ({ date, weight: v.total / v.count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (daily.length < 3) return null;
+
+  const x0 = new Date(`${daily[0].date}T12:00:00`).getTime();
+  const points = daily.map((d) => ({
+    x: (new Date(`${d.date}T12:00:00`).getTime() - x0) / 86_400_000,
+    y: d.weight,
+  }));
+  const n = points.length;
+  const sumX = points.reduce((s, p) => s + p.x, 0);
+  const sumY = points.reduce((s, p) => s + p.y, 0);
+  const sumXY = points.reduce((s, p) => s + p.x * p.y, 0);
+  const sumXX = points.reduce((s, p) => s + p.x * p.x, 0);
+  const denom = n * sumXX - sumX * sumX;
+  if (denom === 0) return null;
+
+  const slopePerDay = (n * sumXY - sumX * sumY) / denom;
+  const current = daily[daily.length - 1].weight;
+  const remaining = goalWeight - current;
+  const movingTowardGoal =
+    (remaining < 0 && slopePerDay < 0) || (remaining > 0 && slopePerDay > 0);
+
+  if (!movingTowardGoal || Math.abs(slopePerDay) < 0.01) {
+    return {
+      text: "Trend is too flat to estimate goal timing yet",
+      subtext: "Log a few more consistent weigh-ins to improve projection confidence.",
+    };
+  }
+
+  const daysToGoal = Math.ceil(Math.abs(remaining / slopePerDay));
+  const weeksToGoal = Math.ceil(daysToGoal / 7);
+  const weeklyRate = Math.abs(slopePerDay * 7);
+
+  return {
+    text: `At this pace: about ${daysToGoal} days (${weeksToGoal} weeks) to goal`,
+    subtext: `Current trend: ~${weeklyRate.toFixed(2)} lbs/week`,
+  };
+}
 
 export default function WeightPage() {
   const [entries, setEntries] = useState<WeightEntry[]>([]);
@@ -90,6 +143,7 @@ export default function WeightPage() {
   const sortedEntries = [...entries].sort((a, b) => b.logged_at.localeCompare(a.logged_at));
   const latestEntry = sortedEntries[0] ?? null;
   const oldestEntry = sortedEntries[sortedEntries.length - 1] ?? null;
+  const paceEstimate = estimateGoalPace(entries, goalWeight);
 
   return (
     <div className="space-y-6">
@@ -127,6 +181,26 @@ export default function WeightPage() {
             goalWeight={goalWeight}
             onGoalSet={handleGoalSet}
           />
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-indigo-600" />
+                Goal Pace Projection
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {paceEstimate ? (
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">{paceEstimate.text}</p>
+                  <p className="text-xs text-muted-foreground">{paceEstimate.subtext}</p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Add a goal and at least 3 days of weight logs to project your timeline.
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <div className="lg:col-span-2 space-y-6">

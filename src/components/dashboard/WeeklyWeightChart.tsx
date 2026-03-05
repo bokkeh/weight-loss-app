@@ -47,7 +47,7 @@ export function WeeklyWeightChart({ entries }: Props) {
         <Tooltip
           formatter={(v) => [`${v} lbs`, "Weight"]}
           wrapperStyle={{ zIndex: 50 }}
-          contentStyle={{ borderRadius: "8px", fontSize: "12px", backgroundColor: "hsl(var(--popover))", borderColor: "hsl(var(--border))", color: "hsl(var(--popover-foreground))" }}
+          contentStyle={{ borderRadius: "8px", fontSize: "12px", backgroundColor: "#ffffff", borderColor: "#e5e7eb", color: "#111827" }}
         />
         <Line type="monotone" dataKey="weight" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
       </LineChart>

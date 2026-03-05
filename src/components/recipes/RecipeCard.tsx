@@ -177,7 +177,7 @@ export function RecipeCard({ recipe, onClick, onDeleted, onPhotoUpdated }: Props
           )}
 
           {/* Hover action buttons */}
-          <div className="absolute inset-0 flex items-start justify-end gap-1.5 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute inset-0 flex items-start justify-end gap-1.5 p-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
             <button
               onClick={handleShare}
               className="bg-black/60 hover:bg-black/80 text-white rounded-full p-1.5 transition-colors"

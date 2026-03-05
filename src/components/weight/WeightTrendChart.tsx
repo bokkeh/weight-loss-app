@@ -79,9 +79,9 @@ export function WeightTrendChart({ entries, goalWeight }: Props) {
           contentStyle={{
             borderRadius: "8px",
             fontSize: "13px",
-            backgroundColor: "hsl(var(--popover))",
-            borderColor: "hsl(var(--border))",
-            color: "hsl(var(--popover-foreground))",
+            backgroundColor: "#ffffff",
+            borderColor: "#e5e7eb",
+            color: "#111827",
           }}
         />
         {goalWeight && (

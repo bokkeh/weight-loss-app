@@ -181,12 +181,12 @@ export function WaterWidget({ sodiumMgToday, hasFoodLogged }: WaterWidgetProps) 
         )}
       </CardHeader>
       <CardContent className="space-y-4">
-        {!hasFoodLogged ? (
-          <p className="text-sm text-muted-foreground">
-            Log a meal to calculate today&apos;s target.
+        {!hasFoodLogged && (
+          <p className="text-xs text-muted-foreground">
+            No meals logged yet. Using baseline hydration target for now.
           </p>
-        ) : (
-          <>
+        )}
+        <>
             {/* Recommended / Consumed numbers */}
             <div className="flex items-end justify-between">
               <div>
@@ -256,8 +256,7 @@ export function WaterWidget({ sodiumMgToday, hasFoodLogged }: WaterWidgetProps) 
                 Goal reached! 🎉 Sodium defeated.
               </p>
             )}
-          </>
-        )}
+        </>
       </CardContent>
     </Card>
   );

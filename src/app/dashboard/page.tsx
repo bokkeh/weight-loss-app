@@ -53,6 +53,23 @@ function getWeekKey() {
   return `${now.getFullYear()}-W${week}`;
 }
 
+function greetingByHour(hour: number): "Good morning" | "Good afternoon" | "Good evening" {
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+function weatherMeta(code: number): { label: string; emoji: string } {
+  if (code === 0) return { label: "Clear", emoji: "☀️" };
+  if ([1, 2].includes(code)) return { label: "Partly Cloudy", emoji: "⛅" };
+  if (code === 3) return { label: "Cloudy", emoji: "☁️" };
+  if ([45, 48].includes(code)) return { label: "Foggy", emoji: "🌫️" };
+  if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return { label: "Rainy", emoji: "🌧️" };
+  if ([71, 73, 75, 85, 86].includes(code)) return { label: "Snowy", emoji: "❄️" };
+  if ([95, 96, 99].includes(code)) return { label: "Stormy", emoji: "⛈️" };
+  return { label: "Mild", emoji: "🌤️" };
+}
+
 function downloadCSV(filename: string, rows: string[][]) {
   const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
@@ -100,6 +117,8 @@ export default function DashboardPage() {
   const [calorieGoal, setCalorieGoal] = useState(2100);
   const [shareLabel, setShareLabel] = useState<"share" | "done">("share");
   const [gutTipIndex, setGutTipIndex] = useState(0);
+  const [firstName, setFirstName] = useState("there");
+  const [weather, setWeather] = useState<{ tempF: number; code: number } | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("calorieGoal");
@@ -114,6 +133,10 @@ export default function DashboardPage() {
       : 0;
     setGutTipIndex(nextTip);
     localStorage.setItem(tipKey, String(nextTip));
+    const storedName = localStorage.getItem("firstName") ?? localStorage.getItem("userName");
+    if (storedName?.trim()) {
+      setFirstName(storedName.trim().split(" ")[0]);
+    }
 
     async function load() {
       const today = localDateStr();
@@ -133,6 +156,32 @@ export default function DashboardPage() {
       setLoading(false);
     }
     load();
+
+    async function fetchWeather(lat: number, lon: number) {
+      const res = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      const current = data?.current;
+      if (typeof current?.temperature_2m === "number" && typeof current?.weather_code === "number") {
+        setWeather({ tempF: current.temperature_2m, code: current.weather_code });
+      }
+    }
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          fetchWeather(pos.coords.latitude, pos.coords.longitude).catch(() => undefined);
+        },
+        () => {
+          fetchWeather(41.8781, -87.6298).catch(() => undefined);
+        },
+        { timeout: 5000 }
+      );
+    } else {
+      fetchWeather(41.8781, -87.6298).catch(() => undefined);
+    }
   }, []);
 
   async function handleGenerateSummary() {
@@ -219,16 +268,27 @@ export default function DashboardPage() {
   });
 
   const weeklyDeficit = weeklyAvgCalories !== null ? calorieGoal - weeklyAvgCalories : null;
+  const greeting = `${greetingByHour(new Date().getHours())}, ${firstName}`;
+  const weatherInfo = weather ? weatherMeta(weather.code) : null;
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <h1 className="text-2xl font-bold">{greeting}</h1>
           <p className="text-muted-foreground text-sm mt-1">Your progress at a glance.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {weatherInfo && weather && (
+            <div className="hidden sm:flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-card">
+              <span className="text-xl leading-none">{weatherInfo.emoji}</span>
+              <div className="leading-tight">
+                <p className="text-sm font-semibold">{Math.round(weather.tempF)}°F</p>
+                <p className="text-[11px] text-muted-foreground">{weatherInfo.label}</p>
+              </div>
+            </div>
+          )}
           <Button variant="outline" size="sm" onClick={handleShare} className="gap-1.5 shrink-0">
             {shareLabel === "done" ? (
               <><Check className="h-3.5 w-3.5 text-green-600" /> Shared!</>
