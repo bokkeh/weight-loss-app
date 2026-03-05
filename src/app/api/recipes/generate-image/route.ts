@@ -43,18 +43,28 @@ export async function POST(req: Request) {
       model: "gpt-image-1",
       prompt,
       size: "1024x1024",
-      response_format: "b64_json",
     });
 
     const first = result.data?.[0];
-    const b64 = first?.b64_json;
-    if (!b64) {
-      return NextResponse.json({ error: "Image generation returned no image." }, { status: 502 });
+    let imageDataUrl: string | null = null;
+
+    if (first?.b64_json) {
+      imageDataUrl = `data:image/png;base64,${first.b64_json}`;
+    } else if (first?.url) {
+      const upstream = await fetch(first.url);
+      if (upstream.ok) {
+        const contentType = upstream.headers.get("content-type") ?? "image/png";
+        const buffer = Buffer.from(await upstream.arrayBuffer());
+        imageDataUrl = `data:${contentType};base64,${buffer.toString("base64")}`;
+      }
     }
 
-    return NextResponse.json({ imageDataUrl: `data:image/png;base64,${b64}` });
+    if (!imageDataUrl) {
+      return NextResponse.json({ error: "Image generation returned no usable image." }, { status: 502 });
+    }
+
+    return NextResponse.json({ imageDataUrl });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }
-

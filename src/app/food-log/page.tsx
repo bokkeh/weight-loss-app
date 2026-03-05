@@ -105,7 +105,7 @@ function isHealthyForMeal(entry: FoodLogEntry, meal: "breakfast" | "lunch" | "di
   return calories >= 250 && calories <= 750 && protein >= 20 && sodium <= 900;
 }
 
-function buildMealRecommendation(todayEntries: FoodLogEntry[], recentEntries: FoodLogEntry[]): string {
+function buildMealIdeas(todayEntries: FoodLogEntry[], recentEntries: FoodLogEntry[]): string[] {
   const now = new Date();
   const targetMeal = targetMealForHour(now.getHours());
   const mealOrder: Array<"breakfast" | "lunch" | "dinner" | "snack"> = [
@@ -154,7 +154,9 @@ function buildMealRecommendation(todayEntries: FoodLogEntry[], recentEntries: Fo
     .sort((a, b) => b.totalScore - a.totalScore);
 
   const best = scored[0]?.entry;
+  const second = scored[1]?.entry;
   const displayMeal = nextMeal.charAt(0).toUpperCase() + nextMeal.slice(1);
+  const ideas: string[] = [];
 
   if (best) {
     const macroHint =
@@ -163,19 +165,49 @@ function buildMealRecommendation(todayEntries: FoodLogEntry[], recentEntries: Fo
         : fiberLeft > 8
           ? "You still need some fiber today, and that choice keeps things balanced."
           : "It fits your current day totals well.";
-    return `What's next for ${displayMeal.toLowerCase()}? If you have any ${best.food_name.toLowerCase()} left from recent meals, go for that. ${macroHint}`;
+    ideas.push(
+      `What's next for ${displayMeal.toLowerCase()}? If you have any ${best.food_name.toLowerCase()} left from recent meals, go for that. ${macroHint}`
+    );
+  }
+
+  if (second && second.id !== best?.id) {
+    ideas.push(
+      `Alternate ${displayMeal.toLowerCase()} idea: reuse ${second.food_name.toLowerCase()} from your last 72 hours for a familiar, on-plan option.`
+    );
+  }
+
+  if (targetMeal === "snack" || now.getHours() >= 21) {
+    if (proteinLeft >= 20 && caloriesLeft >= 150) {
+      ideas.push(
+        "Late-night macro catch-up: a Greek yogurt + berries snack is a clean way to add protein without overshooting calories."
+      );
+    }
+    if (proteinLeft >= 30 && caloriesLeft >= 250) {
+      ideas.push(
+        "Still low on protein after dinner? Try cottage cheese with fruit or a light turkey wrap to close the gap."
+      );
+    }
+    if (caloriesLeft < 120) {
+      ideas.push(
+        "You're close to your calorie goal tonight. Keep snacks very light: fruit, a few carrots, or herbal tea."
+      );
+    }
   }
 
   if (nextMeal === "breakfast") {
-    return "It's almost breakfast. Keep it simple: eggs or yogurt, then add fruit if fiber is low.";
+    ideas.push("It's almost breakfast. Keep it simple: eggs or yogurt, then add fruit if fiber is low.");
   }
-  if (nextMeal === "lunch") {
-    return "What's for lunch? Center it on lean protein and a fiber carb to steady afternoon hunger.";
+  if (nextMeal === "lunch" && ideas.length < 3) {
+    ideas.push("What's for lunch? Center it on lean protein and a fiber carb to steady afternoon hunger.");
   }
-  if (nextMeal === "dinner") {
-    return "Dinner target: protein + vegetables, and keep sodium controlled for a cleaner next weigh-in.";
+  if (nextMeal === "dinner" && ideas.length < 3) {
+    ideas.push("Dinner target: protein + vegetables, and keep sodium controlled for a cleaner next weigh-in.");
   }
-  return "Snack window: choose something protein-forward and moderate in calories to stay aligned with today's goals.";
+  if (ideas.length === 0) {
+    ideas.push("Snack window: choose something protein-forward and moderate in calories to stay aligned with today's goals.");
+  }
+
+  return ideas.slice(0, 5);
 }
 
 export default function FoodLogPage() {
@@ -185,6 +217,7 @@ export default function FoodLogPage() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [shareLabel, setShareLabel] = useState<"share" | "done">("share");
+  const [mealIdeaIndex, setMealIdeaIndex] = useState(0);
 
   const today = new Date();
   const isToday = toDateStr(selectedDate) === toDateStr(today);
@@ -233,7 +266,12 @@ export default function FoodLogPage() {
   }
 
   const totals = sumMacros(entries);
-  const mealRecommendation = buildMealRecommendation(entries, recentEntries);
+  const mealIdeas = buildMealIdeas(entries, recentEntries);
+  const currentMealIdea = mealIdeas[Math.min(mealIdeaIndex, Math.max(0, mealIdeas.length - 1))] ?? "";
+
+  useEffect(() => {
+    setMealIdeaIndex(0);
+  }, [selectedDate, mealIdeas.length]);
 
   return (
     <div className="space-y-6">
@@ -296,14 +334,45 @@ export default function FoodLogPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
           <Card className="mb-6">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Next Meal Idea</CardTitle>
+              {!loading && mealIdeas.length > 1 && (
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setMealIdeaIndex((prev) => (prev - 1 + mealIdeas.length) % mealIdeas.length)}
+                    aria-label="Previous meal idea"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setMealIdeaIndex((prev) => (prev + 1) % mealIdeas.length)}
+                    aria-label="Next meal idea"
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               {loading ? (
                 <Skeleton className="h-10 w-full" />
               ) : (
-                <p className="text-sm text-muted-foreground leading-relaxed">{mealRecommendation}</p>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground leading-relaxed">{currentMealIdea}</p>
+                  {mealIdeas.length > 1 && (
+                    <p className="text-xs text-muted-foreground">
+                      Idea {Math.min(mealIdeaIndex + 1, mealIdeas.length)} of {mealIdeas.length}
+                    </p>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>
