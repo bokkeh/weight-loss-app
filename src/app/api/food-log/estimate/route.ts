@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
-import { estimateMacros, estimateMacrosFromImage } from "@/lib/gemini";
+import { estimateMacros, estimateMacrosFromImage, estimateMacrosFromImages } from "@/lib/gemini";
 import { requireUserId } from "@/lib/route-auth";
 
 export async function POST(req: Request) {
@@ -9,14 +9,29 @@ export async function POST(req: Request) {
   const { userId } = authState;
 
   try {
-    const { text, imageBase64, mimeType, logged_at } = await req.json();
-    if (!text?.trim() && !imageBase64) {
+    const { text, imageBase64, mimeType, images, logged_at } = await req.json();
+    const normalizedImages = Array.isArray(images)
+      ? images
+          .filter((img: unknown) => {
+            if (!img || typeof img !== "object") return false;
+            const rec = img as Record<string, unknown>;
+            return typeof rec.imageBase64 === "string" && rec.imageBase64.trim().length > 0;
+          })
+          .map((img: Record<string, unknown>) => ({
+            imageBase64: String(img.imageBase64),
+            mimeType: typeof img.mimeType === "string" ? img.mimeType : "image/jpeg",
+          }))
+      : [];
+    const hasMultiImages = normalizedImages.length > 0;
+    if (!text?.trim() && !imageBase64 && !hasMultiImages) {
       return NextResponse.json({ error: "text or image is required" }, { status: 400 });
     }
 
-    const macros = imageBase64
-      ? await estimateMacrosFromImage(imageBase64, mimeType ?? "image/jpeg", text?.trim())
-      : await estimateMacros(text.trim());
+    const macros = hasMultiImages
+      ? await estimateMacrosFromImages(normalizedImages, text?.trim())
+      : imageBase64
+        ? await estimateMacrosFromImage(imageBase64, mimeType ?? "image/jpeg", text?.trim())
+        : await estimateMacros(text.trim());
 
     const [entry] = await sql`
       INSERT INTO food_log_entries

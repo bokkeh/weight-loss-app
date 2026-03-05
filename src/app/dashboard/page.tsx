@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -229,6 +230,7 @@ export default function DashboardPage() {
   const greeting = `${greetingByHour(new Date().getHours())}, ${firstName}`;
   const weatherInfo = weather ? weatherMeta(weather.code) : null;
   const WeatherIcon = weatherInfo?.Icon;
+  const hasAnyMealsLogged = foodEntries.length > 0 || todayFood.length > 0;
 
   return (
     <div className="space-y-6">
@@ -355,7 +357,17 @@ export default function DashboardPage() {
             <CardTitle className="text-base">Weight - Last 4 Weeks</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? <Skeleton className="h-48 w-full" /> : <WeeklyWeightChart entries={weeklyWeightEntries} />}
+            {loading ? (
+              <Skeleton className="h-48 w-full" />
+            ) : hasAnyMealsLogged ? (
+              <WeeklyWeightChart entries={weeklyWeightEntries} />
+            ) : (
+              <div className="h-48 rounded-lg border border-dashed flex items-center justify-center text-center px-4">
+                <p className="text-sm text-muted-foreground">
+                  Your charts will populate after your first logged meal and weigh-in.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -363,7 +375,20 @@ export default function DashboardPage() {
             <CardTitle className="text-base">Calories - Last 7 Days</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? <Skeleton className="h-48 w-full" /> : <WeeklyCaloriesChart entries={foodEntries} />}
+            {loading ? (
+              <Skeleton className="h-48 w-full" />
+            ) : hasAnyMealsLogged ? (
+              <WeeklyCaloriesChart entries={foodEntries} />
+            ) : (
+              <div className="h-48 rounded-lg border border-dashed flex flex-col items-center justify-center text-center px-4 gap-2">
+                <p className="text-sm text-muted-foreground">
+                  Log your first meal to start your calorie trend.
+                </p>
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/food-log">Log First Meal</Link>
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -373,7 +398,17 @@ export default function DashboardPage() {
           <CardTitle className="text-base">Today&apos;s Macro Split</CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? <Skeleton className="h-48 w-full" /> : <MacroDonutChart totals={todayTotals} />}
+          {loading ? (
+            <Skeleton className="h-48 w-full" />
+          ) : hasAnyMealsLogged ? (
+            <MacroDonutChart totals={todayTotals} />
+          ) : (
+            <div className="h-48 rounded-lg border border-dashed flex items-center justify-center text-center px-4">
+              <p className="text-sm text-muted-foreground">
+                No meals logged yet. Start with breakfast, lunch, or a snack to see your macro split.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

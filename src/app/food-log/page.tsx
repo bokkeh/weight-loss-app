@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FoodLogEntry, DailyMacroTotals } from "@/types";
 import { shareOrCopy } from "@/lib/shareUtils";
 import { localDateStr } from "@/lib/utils";
+import Link from "next/link";
 
 const GOALS = { calories: 2100, protein_g: 180, carbs_g: 170, fat_g: 75, fiber_g: 30, sodium_mg: 2300 };
 
@@ -472,6 +473,7 @@ export default function FoodLogPage() {
   const mealIdeas = buildMealIdeas(entries, recentEntries);
   const currentMealIdea = mealIdeas[Math.min(mealIdeaIndex, Math.max(0, mealIdeas.length - 1))] ?? "";
   const frequentFoods = buildFrequentFoods(recentEntries);
+  const isFirstMealExperience = recentEntries.length === 0;
 
   useEffect(() => {
     setMealIdeaIndex(0);
@@ -502,34 +504,45 @@ export default function FoodLogPage() {
       {/* Quick Log */}
       <QuickLogBar date={toDateStr(selectedDate)} onAdded={handleAdded} />
 
-      {!loading && frequentFoods.length > 0 && (
+      {!loading && (
         <Card className="gap-2">
           <CardHeader className="pb-0">
             <CardTitle className="text-base">Frequently Logged</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {frequentFoods.map((item) => (
-                <div key={item.key} className="shrink-0 rounded-lg border px-3 py-2 min-w-52 bg-background">
-                  <p className="text-sm font-medium leading-snug truncate">{item.food_name}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {item.serving_size ? `${item.serving_size} - ` : ""}
-                    {item.count}x logged
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {item.calories.toFixed(0)} cal - {item.protein_g.toFixed(0)}g P
-                  </p>
-                  <Button
-                    size="sm"
-                    className="mt-2 h-7 text-xs"
-                    disabled={quickAddingKey === item.key}
-                    onClick={() => handleQuickAddFrequent(item)}
-                  >
-                    {quickAddingKey === item.key ? "Adding..." : "Quick Add Today"}
-                  </Button>
-                </div>
-              ))}
-            </div>
+            {frequentFoods.length > 0 ? (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {frequentFoods.map((item) => (
+                  <div key={item.key} className="shrink-0 rounded-lg border px-3 py-2 min-w-52 bg-background">
+                    <p className="text-sm font-medium leading-snug truncate">{item.food_name}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {item.serving_size ? `${item.serving_size} - ` : ""}
+                      {item.count}x logged
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.calories.toFixed(0)} cal - {item.protein_g.toFixed(0)}g P
+                    </p>
+                    <Button
+                      size="sm"
+                      className="mt-2 h-7 text-xs"
+                      disabled={quickAddingKey === item.key}
+                      onClick={() => handleQuickAddFrequent(item)}
+                    >
+                      {quickAddingKey === item.key ? "Adding..." : "Quick Add Today"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground space-y-2">
+                <p>Your quick-add foods will appear here after your first logged meal.</p>
+                <Button asChild size="sm" variant="outline">
+                  <Link href="#" onClick={(e) => { e.preventDefault(); setOpen(true); }}>
+                    Log First Meal
+                  </Link>
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -600,6 +613,11 @@ export default function FoodLogPage() {
             <CardContent>
               {loading ? (
                 <Skeleton className="h-10 w-full" />
+              ) : isFirstMealExperience ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground space-y-2">
+                  <p>Start by logging your first meal to unlock personalized meal ideas.</p>
+                  <p>We will use your most recent 72 hours of entries and time of day to suggest what to eat next.</p>
+                </div>
               ) : (
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground leading-relaxed">{currentMealIdea}</p>
@@ -642,6 +660,11 @@ export default function FoodLogPage() {
                   {[...Array(5)].map((_, i) => (
                     <Skeleton key={i} className="h-8 w-full" />
                   ))}
+                </div>
+              ) : isFirstMealExperience ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground space-y-2">
+                  <p>No meals logged yet. Your progress bars will populate after your first entry.</p>
+                  <p>Daily targets: 2100 kcal, 180g protein, 170g carbs, 75g fat, 30g fiber, 2300mg sodium.</p>
                 </div>
               ) : (
                 <MacroProgressBars totals={totals} />

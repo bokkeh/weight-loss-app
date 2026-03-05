@@ -53,6 +53,11 @@ export interface FoodLogPayload {
   meal_type: "breakfast" | "lunch" | "dinner" | "snack";
 }
 
+export interface VisionImageInput {
+  imageBase64: string;
+  mimeType: string;
+}
+
 export async function sendChatMessage(
   message: string,
   history: { role: string; content: string }[],
@@ -136,6 +141,57 @@ All numbers must be realistic estimates based on what you see. Return only the J
         ],
       },
     ],
+  });
+
+  const text = response.choices[0].message.content?.trim() ?? "";
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("OpenAI did not return valid JSON");
+  const parsed = JSON.parse(jsonMatch[0]) as FoodLogPayload;
+  const validMealTypes = ["breakfast", "lunch", "dinner", "snack"];
+  if (!validMealTypes.includes(parsed.meal_type)) parsed.meal_type = "snack";
+  return parsed;
+}
+
+export async function estimateMacrosFromImages(
+  images: VisionImageInput[],
+  textHint?: string
+): Promise<FoodLogPayload> {
+  if (images.length === 0) {
+    throw new Error("At least one image is required.");
+  }
+
+  const prompt = `${textHint ? `Context: ${textHint}\n\n` : ""}You are a nutrition database. Estimate total macros for the meal shown across all uploaded images.
+
+Treat all photos as one meal context. Avoid double-counting if images are different angles of the same plate.
+
+Return ONLY a valid JSON object:
+{
+  "food_name": "descriptive name",
+  "serving_size": "estimated total amount with unit",
+  "calories": 0,
+  "protein_g": 0,
+  "carbs_g": 0,
+  "fat_g": 0,
+  "fiber_g": 0,
+  "sodium_mg": 0,
+  "meal_type": "snack"
+}
+
+meal_type must be one of: breakfast, lunch, dinner, snack. Use snack if unclear.
+All numbers must be realistic estimates. Return only the JSON.`;
+
+  const content: OpenAI.Chat.ChatCompletionContentPart[] = [
+    ...images.map((image) => ({
+      type: "image_url" as const,
+      image_url: { url: `data:${image.mimeType};base64,${image.imageBase64}`, detail: "low" as const },
+    })),
+    { type: "text", text: prompt },
+  ];
+
+  const response = await getClient().chat.completions.create({
+    model: "gpt-4o",
+    max_tokens: 350,
+    messages: [{ role: "user", content }],
   });
 
   const text = response.choices[0].message.content?.trim() ?? "";
