@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +22,7 @@ import {
   User,
   Menu,
   Download,
+  LogOut,
 } from "lucide-react";
 import { FoodLogEntry, WeightEntry } from "@/types";
 
@@ -82,6 +84,11 @@ export function TabNav() {
     setMenuOpen(false);
   }
 
+  async function handleSignOut() {
+    setMenuOpen(false);
+    await signOut({ callbackUrl: "/signin" });
+  }
+
   return (
     <>
       {/* Desktop: left sidebar */}
@@ -108,6 +115,17 @@ export function TabNav() {
               </Link>
             );
           })}
+        </div>
+        <div className="p-3 border-t">
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full justify-start gap-3 px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted"
+            onClick={handleSignOut}
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            Sign out
+          </Button>
         </div>
       </nav>
 
@@ -156,6 +174,15 @@ export function TabNav() {
                 >
                   <Download className="h-4 w-4 shrink-0" />
                   Export CSV
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="justify-start gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted"
+                  onClick={handleSignOut}
+                >
+                  <LogOut className="h-4 w-4 shrink-0" />
+                  Sign out
                 </Button>
               </div>
             </SheetContent>
