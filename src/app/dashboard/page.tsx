@@ -231,7 +231,7 @@ export default function DashboardPage() {
   const WeatherIcon = weatherInfo?.Icon;
 
   return (
-    <div className="space-y-6 pt-14 md:pt-0">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">

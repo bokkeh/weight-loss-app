@@ -108,54 +108,56 @@ export function TabNav() {
         </div>
       </nav>
 
-      {/* Mobile: hamburger menu */}
-      <div className="md:hidden fixed top-1 left-3 z-40">
-        <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="h-11 w-11 rounded-xl shadow-sm bg-background/95">
-              <Menu className="h-6 w-6" />
-              <span className="sr-only">Open menu</span>
-            </Button>
-          </SheetTrigger>
-          <SheetContent
-            side="left"
-            className="[&_[data-slot=sheet-close]]:h-10 [&_[data-slot=sheet-close]]:w-10 [&_[data-slot=sheet-close]_svg]:size-5"
-          >
-            <SheetHeader>
-              <SheetTitle>Menu</SheetTitle>
-            </SheetHeader>
-            <div className="mt-4 px-4 pb-4 flex flex-col gap-1">
-              {[...tabs, profileTab].map(({ href, label, icon: Icon }) => {
-                const active = pathname === href || pathname.startsWith(href + "/");
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    onClick={closeMenu}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
-                      active
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                    )}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    {label}
-                  </Link>
-                );
-              })}
-              <Button
-                type="button"
-                variant="ghost"
-                className="justify-start gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted"
-                onClick={handleExportCSV}
-              >
-                <Download className="h-4 w-4 shrink-0" />
-                Export CSV
+      {/* Mobile: sticky top bar + hamburger menu */}
+      <div className="md:hidden sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="h-14 px-3 flex items-center">
+          <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" className="h-11 w-11 rounded-xl shadow-sm bg-background/95">
+                <Menu className="h-6 w-6" />
+                <span className="sr-only">Open menu</span>
               </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
+            </SheetTrigger>
+            <SheetContent
+              side="left"
+              className="[&_[data-slot=sheet-close]]:h-10 [&_[data-slot=sheet-close]]:w-10 [&_[data-slot=sheet-close]_svg]:size-5"
+            >
+              <SheetHeader>
+                <SheetTitle>Menu</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4 px-4 pb-4 flex flex-col gap-1">
+                {[...tabs, profileTab].map(({ href, label, icon: Icon }) => {
+                  const active = pathname === href || pathname.startsWith(href + "/");
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      onClick={closeMenu}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                        active
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      )}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {label}
+                    </Link>
+                  );
+                })}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="justify-start gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted"
+                  onClick={handleExportCSV}
+                >
+                  <Download className="h-4 w-4 shrink-0" />
+                  Export CSV
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
 
       {/* Mobile: bottom bar */}
