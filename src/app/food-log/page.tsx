@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Share2, Check } from "lucide-react";
@@ -23,10 +23,10 @@ import { localDateStr } from "@/lib/utils";
 const GOALS = { calories: 2100, protein_g: 180, carbs_g: 170, fat_g: 75, fiber_g: 30, sodium_mg: 2300 };
 
 const MEAL_EMOJI: Record<string, string> = {
-  breakfast: "🍳",
-  lunch: "🥗",
-  dinner: "🍽️",
-  snack: "🍎",
+  breakfast: "ðŸ³",
+  lunch: "ðŸ¥—",
+  dinner: "ðŸ½ï¸",
+  snack: "ðŸŽ",
 };
 
 function toDateStr(d: Date) {
@@ -62,24 +62,24 @@ function getEntryTimestamp(entry: FoodLogEntry): number {
 
 function buildShareText(entries: FoodLogEntry[], date: Date): string {
   const dateLabel = date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-  const lines: string[] = [`📊 Food Log — ${dateLabel}`, ""];
+  const lines: string[] = [`ðŸ“Š Food Log â€” ${dateLabel}`, ""];
 
   const MEAL_ORDER = ["breakfast", "lunch", "dinner", "snack"] as const;
   for (const meal of MEAL_ORDER) {
     const items = entries.filter((e) => e.meal_type === meal);
     if (items.length === 0) continue;
-    lines.push(`${MEAL_EMOJI[meal] ?? "•"} ${meal.charAt(0).toUpperCase() + meal.slice(1)}`);
+    lines.push(`${MEAL_EMOJI[meal] ?? "â€¢"} ${meal.charAt(0).toUpperCase() + meal.slice(1)}`);
     for (const e of items) {
       const serving = e.serving_size ? ` (${e.serving_size})` : "";
       lines.push(
-        `• ${e.food_name}${serving} — ${Number(e.calories).toFixed(0)} cal | ${Number(e.protein_g).toFixed(1)}g P | ${Number(e.carbs_g).toFixed(1)}g C | ${Number(e.fat_g).toFixed(1)}g F`
+        `â€¢ ${e.food_name}${serving} â€” ${Number(e.calories).toFixed(0)} cal | ${Number(e.protein_g).toFixed(1)}g P | ${Number(e.carbs_g).toFixed(1)}g C | ${Number(e.fat_g).toFixed(1)}g F`
       );
     }
     lines.push("");
   }
 
   const totals = sumMacros(entries);
-  lines.push("📈 Daily Totals");
+  lines.push("ðŸ“ˆ Daily Totals");
   lines.push(
     `Calories: ${totals.calories.toFixed(0)} / ${GOALS.calories} | Protein: ${totals.protein_g.toFixed(1)}g / ${GOALS.protein_g}g | Carbs: ${totals.carbs_g.toFixed(1)}g / ${GOALS.carbs_g}g | Fat: ${totals.fat_g.toFixed(1)}g / ${GOALS.fat_g}g | Fiber: ${totals.fiber_g.toFixed(1)}g / ${GOALS.fiber_g}g | Sodium: ${totals.sodium_mg.toFixed(0)}mg / ${GOALS.sodium_mg}mg`
   );
@@ -488,21 +488,21 @@ export default function FoodLogPage() {
       <QuickLogBar date={toDateStr(selectedDate)} onAdded={handleAdded} />
 
       {!loading && frequentFoods.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="gap-2">
+          <CardHeader className="pb-0">
             <CardTitle className="text-base">Frequently Logged</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div className="flex gap-2 overflow-x-auto pb-1">
               {frequentFoods.map((item) => (
                 <div key={item.key} className="shrink-0 rounded-lg border px-3 py-2 min-w-52 bg-background">
                   <p className="text-sm font-medium leading-snug truncate">{item.food_name}</p>
                   <p className="text-xs text-muted-foreground truncate">
-                    {item.serving_size ? `${item.serving_size} • ` : ""}
+                    {item.serving_size ? `${item.serving_size} - ` : ""}
                     {item.count}x logged
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {item.calories.toFixed(0)} cal • {item.protein_g.toFixed(0)}g P
+                    {item.calories.toFixed(0)} cal - {item.protein_g.toFixed(0)}g P
                   </p>
                   <Button
                     size="sm"
@@ -670,3 +670,5 @@ export default function FoodLogPage() {
     </div>
   );
 }
+
+

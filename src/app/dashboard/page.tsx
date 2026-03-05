@@ -4,13 +4,6 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 import { WeeklyWeightChart } from "@/components/dashboard/WeeklyWeightChart";
 import { WeeklyCaloriesChart } from "@/components/dashboard/WeeklyCaloriesChart";
 import { MacroDonutChart } from "@/components/dashboard/MacroDonutChart";
@@ -23,11 +16,9 @@ import {
   Beef,
   TrendingDown,
   Sparkles,
-  Download,
   Loader2,
   Share2,
   Check,
-  Menu,
   Sun,
   CloudSun,
   Cloud,
@@ -95,15 +86,6 @@ function weatherMeta(code: number): { label: string; Icon: React.ComponentType<{
   return { label: "Mild", Icon: CloudSun };
 }
 
-function downloadCSV(filename: string, rows: string[][]) {
-  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-}
-
 interface StatCardProps {
   title: string;
   value: string;
@@ -141,7 +123,6 @@ export default function DashboardPage() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [calorieGoal, setCalorieGoal] = useState(2100);
   const [shareLabel, setShareLabel] = useState<"share" | "done">("share");
-  const [actionsOpen, setActionsOpen] = useState(false);
   const [gutTipIndex, setGutTipIndex] = useState(0);
   const [firstName, setFirstName] = useState("there");
   const [profileImageUrl, setProfileImageUrl] = useState("");
@@ -232,25 +213,6 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleExportCSV() {
-    const [allWeight, allFood] = await Promise.all([
-      fetch("/api/weight?weeks=520").then((r) => r.json()),
-      fetch("/api/food-log?weeks=520").then((r) => r.json()),
-    ]);
-    downloadCSV("weight-log.csv", [
-      ["Date", "Weight (lbs)", "Note"],
-      ...(allWeight as WeightEntry[]).map((e) => [e.logged_at, String(e.weight_lbs), e.note ?? ""]),
-    ]);
-    downloadCSV("food-log.csv", [
-      ["Date", "Food", "Meal", "Calories", "Protein(g)", "Carbs(g)", "Fat(g)", "Fiber(g)", "Serving"],
-      ...(allFood as FoodLogEntry[]).map((e) => [
-        e.logged_at, e.food_name, e.meal_type ?? "",
-        String(e.calories), String(e.protein_g), String(e.carbs_g), String(e.fat_g), String(e.fiber_g),
-        e.serving_size ?? "",
-      ]),
-    ]);
-  }
-
   async function handleShare() {
     const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
     const latestW = sortedWeight[0];
@@ -328,31 +290,6 @@ export default function DashboardPage() {
                   <><Share2 className="h-3.5 w-3.5" /> Share</>
                 )}
               </Button>
-              <Sheet open={actionsOpen} onOpenChange={setActionsOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" aria-label="Open actions menu">
-                    <Menu className="h-4 w-4" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right" className="w-72">
-                  <SheetHeader>
-                    <SheetTitle>Dashboard Menu</SheetTitle>
-                  </SheetHeader>
-                  <div className="mt-4 flex flex-col gap-2">
-                    <Button
-                      variant="outline"
-                      className="justify-start gap-2"
-                      onClick={async () => {
-                        await handleExportCSV();
-                        setActionsOpen(false);
-                      }}
-                    >
-                      <Download className="h-4 w-4" />
-                      Export CSV
-                    </Button>
-                  </div>
-                </SheetContent>
-              </Sheet>
             </div>
           </div>
         </div>

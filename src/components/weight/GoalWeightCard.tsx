@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,14 +41,14 @@ export function GoalWeightCard({ startWeight, currentWeight, goalWeight, onGoalS
     currentWeight && goalWeight ? currentWeight - goalWeight : null;
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
+    <Card className="gap-2">
+      <CardHeader className="pb-0">
         <CardTitle className="flex items-center gap-2 text-base">
           <Target className="h-4 w-4 text-green-600" />
           Goal Weight
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 pt-0">
         {editing ? (
           <div className="flex gap-2">
             <Input
@@ -64,7 +64,7 @@ export function GoalWeightCard({ startWeight, currentWeight, goalWeight, onGoalS
           </div>
         ) : (
           <>
-            <div className="flex items-end justify-between">
+            <div className="flex items-end justify-between gap-3">
               <div>
                 <p className="text-3xl font-bold">{goalWeight} <span className="text-lg font-normal text-muted-foreground">lbs</span></p>
                 {lbsLeft !== null && (
@@ -72,8 +72,8 @@ export function GoalWeightCard({ startWeight, currentWeight, goalWeight, onGoalS
                     {lbsLeft > 0
                       ? `${lbsLeft.toFixed(1)} lbs to go`
                       : lbsLeft < 0
-                      ? `${Math.abs(lbsLeft).toFixed(1)} lbs below goal 🎉`
-                      : "Goal reached! 🎉"}
+                      ? `${Math.abs(lbsLeft).toFixed(1)} lbs below goal `
+                      : "Goal reached! "}
                   </p>
                 )}
               </div>
@@ -93,3 +93,5 @@ export function GoalWeightCard({ startWeight, currentWeight, goalWeight, onGoalS
     </Card>
   );
 }
+
+

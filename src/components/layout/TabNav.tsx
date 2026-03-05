@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -19,7 +20,9 @@ import {
   BookOpen,
   User,
   Menu,
+  Download,
 } from "lucide-react";
+import { FoodLogEntry, WeightEntry } from "@/types";
 
 const tabs = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -38,6 +41,42 @@ const desktopTabs = [
 
 export function TabNav() {
   const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  function downloadCSV(filename: string, rows: string[][]) {
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+  }
+
+  async function handleExportCSV() {
+    const [allWeight, allFood] = await Promise.all([
+      fetch("/api/weight?weeks=520").then((r) => r.json()),
+      fetch("/api/food-log?weeks=520").then((r) => r.json()),
+    ]);
+    downloadCSV("weight-log.csv", [
+      ["Date", "Weight (lbs)", "Note"],
+      ...(allWeight as WeightEntry[]).map((e) => [e.logged_at, String(e.weight_lbs), e.note ?? ""]),
+    ]);
+    downloadCSV("food-log.csv", [
+      ["Date", "Food", "Meal", "Calories", "Protein(g)", "Carbs(g)", "Fat(g)", "Fiber(g)", "Serving"],
+      ...(allFood as FoodLogEntry[]).map((e) => [
+        e.logged_at,
+        e.food_name,
+        e.meal_type ?? "",
+        String(e.calories),
+        String(e.protein_g),
+        String(e.carbs_g),
+        String(e.fat_g),
+        String(e.fiber_g),
+        e.serving_size ?? "",
+      ]),
+    ]);
+    setMenuOpen(false);
+  }
 
   return (
     <>
@@ -69,8 +108,8 @@ export function TabNav() {
       </nav>
 
       {/* Mobile: hamburger menu */}
-      <div className="md:hidden fixed top-3 right-3 z-[60]">
-        <Sheet>
+      <div className="md:hidden fixed top-3 left-3 z-[60]">
+        <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
           <SheetTrigger asChild>
             <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shadow-sm bg-background/95">
               <Menu className="h-4 w-4" />
@@ -100,6 +139,15 @@ export function TabNav() {
                   </Link>
                 );
               })}
+              <Button
+                type="button"
+                variant="ghost"
+                className="justify-start gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted"
+                onClick={handleExportCSV}
+              >
+                <Download className="h-4 w-4 shrink-0" />
+                Export CSV
+              </Button>
             </div>
           </SheetContent>
         </Sheet>
