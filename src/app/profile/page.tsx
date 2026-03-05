@@ -32,11 +32,21 @@ export default function ProfilePage() {
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
 
+  function parseJsonSafe<T>(raw: string, fallback: T): T {
+    try {
+      return raw ? (JSON.parse(raw) as T) : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
   useEffect(() => {
     async function load() {
       try {
         const res = await fetch("/api/profile");
-        const profile = (await res.json()) as UserProfile;
+        const raw = await res.text().catch(() => "");
+        const profile = parseJsonSafe<UserProfile & { error?: string }>(raw, {});
+        if (!res.ok) throw new Error(profile.error ?? "Failed to load profile");
         setForm({
           first_name: profile.first_name ?? "",
           last_name: profile.last_name ?? "",
@@ -45,6 +55,8 @@ export default function ProfilePage() {
           dietary_restrictions: (profile.dietary_restrictions ?? []).join(", "),
           profile_image_url: profile.profile_image_url ?? "",
         });
+      } catch (err) {
+        setMessage(err instanceof Error ? err.message : "Failed to load profile");
       } finally {
         setLoading(false);
       }
@@ -98,7 +110,8 @@ export default function ProfilePage() {
           profile_image_url: form.profile_image_url.trim() || null,
         }),
       });
-      const data = await res.json().catch(() => ({}));
+      const raw = await res.text().catch(() => "");
+      const data = parseJsonSafe<{ error?: string }>(raw, {});
       if (!res.ok) throw new Error(data.error ?? "Failed to save profile");
 
       localStorage.setItem("firstName", form.first_name.trim());

@@ -38,27 +38,34 @@ async function ensureMultiUserSchemaInternal() {
     )
   `;
 
-  await sql`
-    CREATE TABLE IF NOT EXISTS auth_signin_events (
-      id            SERIAL PRIMARY KEY,
-      event_type    TEXT NOT NULL,
-      provider      TEXT,
-      path          TEXT,
-      user_agent    TEXT,
-      ip_address    TEXT,
-      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
 
   await sql`
     CREATE INDEX IF NOT EXISTS idx_auth_login_events_user_time
       ON auth_login_events (user_id, logged_in_at DESC)
   `;
 
-  await sql`
-    CREATE INDEX IF NOT EXISTS idx_auth_signin_events_created
-      ON auth_signin_events (created_at DESC)
-  `;
+  // Optional analytics table for sign-in page traffic.
+  // Keep auth/profile functional even if this setup fails in constrained DB environments.
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS auth_signin_events (
+        id            SERIAL PRIMARY KEY,
+        event_type    TEXT NOT NULL,
+        provider      TEXT,
+        path          TEXT,
+        user_agent    TEXT,
+        ip_address    TEXT,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_auth_signin_events_created
+        ON auth_signin_events (created_at DESC)
+    `;
+  } catch (error) {
+    console.error("Optional auth_signin_events setup failed:", error);
+  }
 
   await sql`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_user_profiles_email_unique

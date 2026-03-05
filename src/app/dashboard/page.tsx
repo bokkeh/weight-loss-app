@@ -110,6 +110,19 @@ function StatCard({ title, value, subtitle, icon, color, valueColor }: StatCardP
   );
 }
 
+function FirstMealWidgetPlaceholder({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className={`rounded-lg border border-dashed flex items-center justify-center text-center ${compact ? "min-h-28 p-3" : "h-48 px-4"}`}>
+      <div className="space-y-2">
+        <p className="text-sm text-muted-foreground">To see this widget, log your first meal.</p>
+        <Button asChild size="sm" variant="outline">
+          <Link href="/food-log">Log Meal</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [weightEntries, setWeightEntries] = useState<WeightEntry[]>([]);
   const [foodEntries, setFoodEntries] = useState<FoodLogEntry[]>([]);
@@ -267,6 +280,16 @@ export default function DashboardPage() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28" />)}
         </div>
+      ) : !hasAnyMealsLogged ? (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="pt-6">
+                <FirstMealWidgetPlaceholder compact />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
@@ -362,11 +385,7 @@ export default function DashboardPage() {
             ) : hasAnyMealsLogged ? (
               <WeeklyWeightChart entries={weeklyWeightEntries} />
             ) : (
-              <div className="h-48 rounded-lg border border-dashed flex items-center justify-center text-center px-4">
-                <p className="text-sm text-muted-foreground">
-                  Your charts will populate after your first logged meal and weigh-in.
-                </p>
-              </div>
+              <FirstMealWidgetPlaceholder />
             )}
           </CardContent>
         </Card>
@@ -380,14 +399,7 @@ export default function DashboardPage() {
             ) : hasAnyMealsLogged ? (
               <WeeklyCaloriesChart entries={foodEntries} />
             ) : (
-              <div className="h-48 rounded-lg border border-dashed flex flex-col items-center justify-center text-center px-4 gap-2">
-                <p className="text-sm text-muted-foreground">
-                  Log your first meal to start your calorie trend.
-                </p>
-                <Button asChild size="sm" variant="outline">
-                  <Link href="/food-log">Log First Meal</Link>
-                </Button>
-              </div>
+              <FirstMealWidgetPlaceholder />
             )}
           </CardContent>
         </Card>
@@ -403,11 +415,7 @@ export default function DashboardPage() {
           ) : hasAnyMealsLogged ? (
             <MacroDonutChart totals={todayTotals} />
           ) : (
-            <div className="h-48 rounded-lg border border-dashed flex items-center justify-center text-center px-4">
-              <p className="text-sm text-muted-foreground">
-                No meals logged yet. Start with breakfast, lunch, or a snack to see your macro split.
-              </p>
-            </div>
+            <FirstMealWidgetPlaceholder />
           )}
         </CardContent>
       </Card>
