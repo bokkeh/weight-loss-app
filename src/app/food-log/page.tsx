@@ -225,6 +225,16 @@ interface FrequentFood {
   lastLoggedAt: string;
 }
 
+async function readJsonSafe<T>(res: Response): Promise<T | null> {
+  const text = await res.text().catch(() => "");
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
 function buildFrequentFoods(entries: FoodLogEntry[]): FrequentFood[] {
   const groups = new Map<string, FrequentFood>();
   for (const entry of entries) {
@@ -358,9 +368,13 @@ export default function FoodLogPage() {
         fetch(`/api/food-log?date=${toDateStr(selectedDate)}`),
         fetch("/api/food-log?weeks=6"),
       ]);
-      const [dayData, recentData] = await Promise.all([dayRes.json(), recentRes.json()]);
-      setEntries(Array.isArray(dayData) ? dayData : []);
-      setRecentEntries(Array.isArray(recentData) ? recentData : []);
+      const [dayData, recentData] = await Promise.all([
+        readJsonSafe<FoodLogEntry[] | { error?: string }>(dayRes),
+        readJsonSafe<FoodLogEntry[] | { error?: string }>(recentRes),
+      ]);
+
+      setEntries(dayRes.ok && Array.isArray(dayData) ? dayData : []);
+      setRecentEntries(recentRes.ok && Array.isArray(recentData) ? recentData : []);
     } finally {
       setLoading(false);
     }
@@ -443,7 +457,8 @@ export default function FoodLogPage() {
         }),
       });
       if (!res.ok) throw new Error(await res.text());
-      const added: FoodLogEntry = await res.json();
+      const added = await readJsonSafe<FoodLogEntry>(res);
+      if (!added) throw new Error("Failed to parse food log response.");
       setRecentEntries((prev) => [added, ...prev]);
       if (toDateStr(selectedDate) === todayStr) {
         setEntries((prev) => [...prev, added]);
