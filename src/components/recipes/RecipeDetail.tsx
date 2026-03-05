@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -78,9 +77,9 @@ export function RecipeDetail({
           <SheetTitle className="text-xl">{recipe.name}</SheetTitle>
         </SheetHeader>
 
-        <div className="mt-4 space-y-6 pb-6">
+        <div className="mt-4 space-y-6 pb-6 px-4 sm:px-6">
           {recipe.image_url && (
-            <div className="relative h-52 -mx-6 overflow-hidden">
+            <div className="relative h-52 -mx-4 sm:-mx-6 overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={recipe.image_url}
