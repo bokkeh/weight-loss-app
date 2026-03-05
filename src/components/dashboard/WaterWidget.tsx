@@ -24,6 +24,23 @@ function calcRecommended(sodiumMg: number): number {
   return roundToNearest8(clamped);
 }
 
+function formatElapsedSince(isoDate: string, nowMs: number): string {
+  const thenMs = new Date(isoDate).getTime();
+  if (Number.isNaN(thenMs)) return "just now";
+
+  const elapsedMin = Math.max(0, Math.floor((nowMs - thenMs) / 60000));
+  if (elapsedMin < 1) return "just now";
+  if (elapsedMin < 60) return `${elapsedMin}m ago`;
+
+  const hours = Math.floor(elapsedMin / 60);
+  const mins = elapsedMin % 60;
+  if (hours < 24) return mins === 0 ? `${hours}h ago` : `${hours}h ${mins}m ago`;
+
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return remHours === 0 ? `${days}d ago` : `${days}d ${remHours}h ago`;
+}
+
 interface WaterWidgetProps {
   sodiumMgToday: number;
   hasFoodLogged: boolean;
@@ -34,6 +51,7 @@ export function WaterWidget({ sodiumMgToday, hasFoodLogged }: WaterWidgetProps) 
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const today = localDateStr();
 
@@ -48,11 +66,19 @@ export function WaterWidget({ sodiumMgToday, hasFoodLogged }: WaterWidgetProps) 
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (entries.length === 0) return;
+    const timerId = window.setInterval(() => setNowMs(Date.now()), 30000);
+    return () => window.clearInterval(timerId);
+  }, [entries.length]);
+
   const consumedOz = entries.reduce((sum, e) => sum + Number(e.ounces), 0);
   const recommended = calcRecommended(sodiumMgToday);
   const pct = Math.min(1, consumedOz / recommended);
   const glassesLogged = Math.round(consumedOz / GLASS_OZ);
   const glassesNeeded = Math.round(recommended / GLASS_OZ);
+  const lastEntry = entries.length > 0 ? entries[entries.length - 1] : null;
+  const elapsedSinceLast = lastEntry ? formatElapsedSince(lastEntry.created_at, nowMs) : null;
 
   async function handleAdd() {
     if (adding) return;
@@ -127,7 +153,7 @@ export function WaterWidget({ sodiumMgToday, hasFoodLogged }: WaterWidgetProps) 
             {/* Recommended / Consumed numbers */}
             <div className="flex items-end justify-between">
               <div>
-                <p className="text-3xl font-bold text-sky-500">
+                <p className="text-3xl font-bold text-sky-500 tabular-nums transition-all duration-200">
                   {loading ? "—" : `${consumedOz}`}
                   <span className="text-base font-normal text-muted-foreground ml-1">oz</span>
                 </p>
@@ -158,6 +184,9 @@ export function WaterWidget({ sodiumMgToday, hasFoodLogged }: WaterWidgetProps) 
             {/* Helper text */}
             <p className="text-xs text-muted-foreground">
               Based on today&apos;s sodium intake ({Math.round(sodiumMgToday).toLocaleString()} mg).
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Last glass: {elapsedSinceLast ?? "not logged yet"}
             </p>
 
             {/* Buttons */}

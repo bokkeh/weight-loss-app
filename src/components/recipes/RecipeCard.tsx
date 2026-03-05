@@ -12,7 +12,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Recipe } from "@/types";
-import { ImageOff, Camera, Trash2, Upload, Link } from "lucide-react";
+import { shareOrCopy } from "@/lib/shareUtils";
+import { ImageOff, Camera, Trash2, Upload, Link, Share2, Check } from "lucide-react";
 
 interface Props {
   recipe: Recipe;
@@ -29,6 +30,7 @@ export function RecipeCard({ recipe, onClick, onDeleted, onPhotoUpdated }: Props
   const [photoPreview, setPhotoPreview] = useState<string | null>(recipe.image_url ?? null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [shareDone, setShareDone] = useState(false);
 
   function stopProp(e: React.MouseEvent) {
     e.stopPropagation();
@@ -93,10 +95,34 @@ export function RecipeCard({ recipe, onClick, onDeleted, onPhotoUpdated }: Props
     }
   }
 
+  async function handleShare(e: React.MouseEvent) {
+    e.stopPropagation();
+
+    const shareText = [
+      recipe.name,
+      `Calories: ${Number(recipe.calories).toFixed(0)} kcal`,
+      `Protein: ${Number(recipe.protein_g).toFixed(1)}g`,
+      `Carbs: ${Number(recipe.carbs_g).toFixed(1)}g`,
+      `Fat: ${Number(recipe.fat_g).toFixed(1)}g`,
+      recipe.tags?.length ? `Tags: ${recipe.tags.join(", ")}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    try {
+      await shareOrCopy(shareText, recipe.name);
+      setShareDone(true);
+      setTimeout(() => setShareDone(false), 2000);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      console.error("Failed to share recipe:", err);
+    }
+  }
+
   return (
     <>
       <Card
-        className="cursor-pointer hover:shadow-md transition-shadow overflow-hidden group"
+        className="cursor-pointer hover:shadow-md transition-shadow overflow-hidden group py-0 gap-0"
         onClick={onClick}
       >
         <div className="relative h-40 bg-muted">
@@ -115,6 +141,13 @@ export function RecipeCard({ recipe, onClick, onDeleted, onPhotoUpdated }: Props
 
           {/* Hover action buttons */}
           <div className="absolute inset-0 flex items-start justify-end gap-1.5 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={handleShare}
+              className="bg-black/60 hover:bg-black/80 text-white rounded-full p-1.5 transition-colors"
+              title="Share recipe"
+            >
+              {shareDone ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
+            </button>
             <button
               onClick={openPhoto}
               className="bg-black/60 hover:bg-black/80 text-white rounded-full p-1.5 transition-colors"
