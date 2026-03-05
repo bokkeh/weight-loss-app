@@ -12,6 +12,44 @@ async function syncUserProfileIdSequence() {
   `;
 }
 
+async function insertProfileWithoutSequence(params: {
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  imageUrl: string | null;
+}) {
+  const { email, firstName, lastName, imageUrl } = params;
+  const [inserted] = await sql`
+    WITH existing AS (
+      SELECT id
+      FROM user_profiles
+      WHERE LOWER(email) = LOWER(${email})
+      LIMIT 1
+    ),
+    next_id AS (
+      SELECT COALESCE(MAX(id), 0) + 1 AS id
+      FROM user_profiles
+    ),
+    inserted AS (
+      INSERT INTO user_profiles (id, email, first_name, last_name, profile_image_url)
+      SELECT
+        next_id.id,
+        ${email},
+        ${firstName},
+        ${lastName},
+        ${imageUrl}
+      FROM next_id
+      WHERE NOT EXISTS (SELECT 1 FROM existing)
+      RETURNING id
+    )
+    SELECT id FROM inserted
+    UNION ALL
+    SELECT id FROM existing
+    LIMIT 1
+  `;
+  return inserted?.id ? Number(inserted.id) : null;
+}
+
 async function ensureMultiUserSchemaInternal() {
   await sql`
     CREATE TABLE IF NOT EXISTS user_profiles (
@@ -187,58 +225,40 @@ export async function getOrCreateUserId(params: {
 
   const userId = existing?.id
     ? Number(existing.id)
-    : Number(
-        (
-          await (async () => {
-            try {
-              return await sql`
-                INSERT INTO user_profiles (email, first_name, last_name, profile_image_url)
-                VALUES (
-                  ${email},
-                  ${firstName},
-                  ${lastName},
-                  ${imageUrl}
-                )
-                RETURNING id
-              `;
-            } catch (error) {
-              const e = error as { code?: string; constraint?: string };
-              if (e.code === "23505") {
-                // Sequence drift can collide on PK; re-sync and retry once.
-                if (e.constraint === "user_profiles_pkey") {
-                  await syncUserProfileIdSequence();
-                  try {
-                    return await sql`
-                      INSERT INTO user_profiles (email, first_name, last_name, profile_image_url)
-                      VALUES (
-                        ${email},
-                        ${firstName},
-                        ${lastName},
-                        ${imageUrl}
-                      )
-                      RETURNING id
-                    `;
-                  } catch {
-                    // fall through to lookup by email below
-                  }
-                }
+    : await (async () => {
+        try {
+          const insertedId = await insertProfileWithoutSequence({
+            email,
+            firstName,
+            lastName,
+            imageUrl,
+          });
+          if (insertedId) return insertedId;
+        } catch (error) {
+          const e = error as { code?: string; constraint?: string };
+          if (e.code === "23505" && e.constraint === "user_profiles_pkey") {
+            // Legacy deployments may still have sequence drift; sync and retry once.
+            await syncUserProfileIdSequence();
+            const insertedId = await insertProfileWithoutSequence({
+              email,
+              firstName,
+              lastName,
+              imageUrl,
+            });
+            if (insertedId) return insertedId;
+          }
+        }
 
-                // For races/unique conflicts, try resolving by email.
-                const [byEmail] = await sql`
-                  SELECT id
-                  FROM user_profiles
-                  WHERE LOWER(email) = LOWER(${email})
-                  LIMIT 1
-                `;
-                if (byEmail?.id) {
-                  return [{ id: byEmail.id }];
-                }
-              }
-              throw error;
-            }
-          })()
-        )[0].id
-      );
+        const [byEmail] = await sql`
+          SELECT id
+          FROM user_profiles
+          WHERE LOWER(email) = LOWER(${email})
+          LIMIT 1
+        `;
+        if (byEmail?.id) return Number(byEmail.id);
+
+        throw new Error("Unable to create or locate user profile");
+      })();
 
   await sql`
     UPDATE user_profiles
