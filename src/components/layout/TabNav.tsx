@@ -110,11 +110,11 @@ export function TabNav() {
 
       {/* Mobile: sticky top bar + hamburger menu */}
       <div className="md:hidden sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="h-14 px-3 flex items-center">
+        <div className="relative h-14 px-3 flex items-center">
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="h-11 w-11 rounded-xl shadow-sm bg-background/95">
-                <Menu className="h-6 w-6" />
+              <Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl">
+                <Menu className="h-8 w-8" strokeWidth={2.75} />
                 <span className="sr-only">Open menu</span>
               </Button>
             </SheetTrigger>
@@ -157,6 +157,14 @@ export function TabNav() {
               </div>
             </SheetContent>
           </Sheet>
+          <Link
+            href="/dashboard"
+            className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center"
+            aria-label="Go to dashboard"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icon.svg" alt="WeightTrack logo" className="h-7 w-7" />
+          </Link>
         </div>
       </div>
 
