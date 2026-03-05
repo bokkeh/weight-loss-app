@@ -40,6 +40,7 @@ const SORT_LABELS: Record<SortKey, string> = {
 export default function RecipesPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [search, setSearch] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [sort, setSort] = useState<SortKey>("newest");
@@ -54,7 +55,16 @@ export default function RecipesPage() {
     async function load() {
       try {
         const res = await fetch("/api/recipes");
-        setRecipes(await res.json());
+        const raw = await res.text().catch(() => "");
+        const data = raw ? JSON.parse(raw) : [];
+        if (!res.ok) {
+          const msg = typeof data?.error === "string" ? data.error : "Failed to load recipes";
+          throw new Error(msg);
+        }
+        setRecipes(Array.isArray(data) ? data : []);
+      } catch (err) {
+        setRecipes([]);
+        setLoadError(err instanceof Error ? err.message : "Failed to load recipes");
       } finally {
         setLoading(false);
       }
@@ -258,6 +268,10 @@ export default function RecipesPage() {
       {loading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-64" />)}
+        </div>
+      ) : loadError ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          {loadError}
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">

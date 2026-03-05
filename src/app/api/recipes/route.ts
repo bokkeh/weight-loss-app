@@ -2,15 +2,43 @@ import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { requireUserId } from "@/lib/route-auth";
 
-export async function GET(req: Request) {
-  const authState = await requireUserId();
-  if ("response" in authState) return authState.response;
-  const { userId } = authState;
-
-  const { searchParams } = new URL(req.url);
-  const tag = searchParams.get("tag");
-
+async function ensureRecipesTable() {
   try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS recipes (
+        id            SERIAL PRIMARY KEY,
+        user_id       INTEGER NOT NULL DEFAULT 1,
+        name          TEXT NOT NULL,
+        description   TEXT,
+        servings      INTEGER NOT NULL DEFAULT 1,
+        calories      NUMERIC NOT NULL DEFAULT 0,
+        protein_g     NUMERIC NOT NULL DEFAULT 0,
+        carbs_g       NUMERIC NOT NULL DEFAULT 0,
+        fat_g         NUMERIC NOT NULL DEFAULT 0,
+        fiber_g       NUMERIC NOT NULL DEFAULT 0,
+        ingredients   TEXT,
+        instructions  TEXT,
+        image_url     TEXT,
+        tags          TEXT[] NOT NULL DEFAULT '{}',
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_recipes_user_id ON recipes (user_id)`;
+  } catch (error) {
+    console.error("ensureRecipesTable failed:", error);
+  }
+}
+
+export async function GET(req: Request) {
+  try {
+    const authState = await requireUserId();
+    if ("response" in authState) return authState.response;
+    const { userId } = authState;
+    const { searchParams } = new URL(req.url);
+    const tag = searchParams.get("tag");
+    await ensureRecipesTable();
+
     let recipes;
     if (tag) {
       recipes = await sql`
@@ -39,11 +67,12 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const authState = await requireUserId();
-  if ("response" in authState) return authState.response;
-  const { userId } = authState;
-
   try {
+    const authState = await requireUserId();
+    if ("response" in authState) return authState.response;
+    const { userId } = authState;
+    await ensureRecipesTable();
+
     const body = await req.json();
     const {
       name,
