@@ -29,6 +29,21 @@ async function ensureMultiUserSchemaInternal() {
   `;
 
   await sql`
+    CREATE TABLE IF NOT EXISTS auth_login_events (
+      id            SERIAL PRIMARY KEY,
+      user_id       INTEGER NOT NULL,
+      email         TEXT,
+      provider      TEXT,
+      logged_in_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_auth_login_events_user_time
+      ON auth_login_events (user_id, logged_in_at DESC)
+  `;
+
+  await sql`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_user_profiles_email_unique
       ON user_profiles (LOWER(email))
       WHERE email IS NOT NULL
@@ -164,4 +179,17 @@ export async function getOrCreateUserId(params: {
   }
 
   return userId;
+}
+
+export async function recordLoginEvent(params: {
+  userId: number;
+  email?: string | null;
+  provider?: string | null;
+}) {
+  const { userId, email = null, provider = null } = params;
+  await ensureMultiUserSchema();
+  await sql`
+    INSERT INTO auth_login_events (user_id, email, provider)
+    VALUES (${userId}, ${email}, ${provider})
+  `;
 }

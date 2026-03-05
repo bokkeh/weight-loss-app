@@ -1,6 +1,6 @@
 import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import { findUserIdByEmail, getOrCreateUserId } from "@/lib/auth-user";
+import { findUserIdByEmail, getOrCreateUserId, recordLoginEvent } from "@/lib/auth-user";
 
 function splitName(name: string | null | undefined) {
   if (!name?.trim()) return { firstName: null, lastName: null };
@@ -28,8 +28,24 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account }) {
       const email = user.email?.trim();
       if (!email) return false;
-      // Keep sign-in callback lightweight; user provisioning happens in jwt callback.
-      void account;
+      try {
+        const { firstName, lastName } = splitName(user.name);
+        const userId = await getOrCreateUserId({
+          email,
+          firstName,
+          lastName,
+          imageUrl: user.image ?? null,
+          provider: account?.provider ?? null,
+          providerAccountId: account?.providerAccountId ?? null,
+        });
+        await recordLoginEvent({
+          userId,
+          email,
+          provider: account?.provider ?? null,
+        });
+      } catch (error) {
+        console.error("NextAuth signIn callback error:", error);
+      }
       return true;
     },
     async jwt({ token, account, user }) {

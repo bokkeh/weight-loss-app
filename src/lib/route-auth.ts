@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { ensureMultiUserSchema } from "@/lib/auth-user";
 import { getOrCreateUserId } from "@/lib/auth-user";
+import { isAdminEmail } from "@/lib/admin";
 
 export async function requireUserId() {
   await ensureMultiUserSchema();
@@ -34,4 +35,18 @@ export async function requireUserId() {
   return {
     response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
   };
+}
+
+export async function requireAdminUser() {
+  const session = await getServerSession(authOptions);
+  const email = session?.user?.email ?? null;
+  if (!isAdminEmail(email)) {
+    return {
+      response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+    };
+  }
+
+  const base = await requireUserId();
+  if ("response" in base) return base;
+  return { ...base, email };
 }
