@@ -11,12 +11,28 @@ interface AdminUserRow {
   email: string | null;
   profile_image_url: string | null;
   last_login_at: string | null;
+  last_activity_at: string | null;
   logins_today: number;
+  weight_entries: number;
+  food_logs: number;
+  water_logs: number;
+  recipes: number;
+  chat_messages: number;
 }
 
 interface DailyRow {
   day: string;
   login_count: number;
+}
+
+interface GlobalTotals {
+  users: number;
+  profiles: number;
+  weight_entries: number;
+  food_logs: number;
+  water_logs: number;
+  recipes: number;
+  chat_messages: number;
 }
 
 export default async function AdminPage() {
@@ -26,18 +42,93 @@ export default async function AdminPage() {
   }
 
   const users = (await sql`
+    WITH all_user_ids AS (
+      SELECT id AS user_id FROM user_profiles
+      UNION
+      SELECT user_id FROM weight_entries
+      UNION
+      SELECT user_id FROM food_log_entries
+      UNION
+      SELECT user_id FROM water_log_entries
+      UNION
+      SELECT user_id FROM recipes
+      UNION
+      SELECT user_id FROM chat_messages
+      UNION
+      SELECT user_id FROM auth_login_events
+    ),
+    login_agg AS (
+      SELECT
+        user_id,
+        MAX(logged_in_at) AS last_login_at,
+        COUNT(*) FILTER (WHERE logged_in_at::date = CURRENT_DATE)::int AS logins_today
+      FROM auth_login_events
+      GROUP BY user_id
+    ),
+    weight_agg AS (
+      SELECT user_id, COUNT(*)::int AS weight_entries, MAX(created_at) AS last_weight_at
+      FROM weight_entries
+      GROUP BY user_id
+    ),
+    food_agg AS (
+      SELECT user_id, COUNT(*)::int AS food_logs, MAX(created_at) AS last_food_at
+      FROM food_log_entries
+      GROUP BY user_id
+    ),
+    water_agg AS (
+      SELECT user_id, COUNT(*)::int AS water_logs, MAX(created_at) AS last_water_at
+      FROM water_log_entries
+      GROUP BY user_id
+    ),
+    recipe_agg AS (
+      SELECT user_id, COUNT(*)::int AS recipes, MAX(created_at) AS last_recipe_at
+      FROM recipes
+      GROUP BY user_id
+    ),
+    chat_agg AS (
+      SELECT user_id, COUNT(*)::int AS chat_messages, MAX(created_at) AS last_chat_at
+      FROM chat_messages
+      GROUP BY user_id
+    )
     SELECT
-      up.id,
+      au.user_id::int AS id,
       up.first_name,
       up.last_name,
       up.email,
       up.profile_image_url,
-      MAX(le.logged_in_at)::text AS last_login_at,
-      COUNT(*) FILTER (WHERE le.logged_in_at::date = CURRENT_DATE)::int AS logins_today
-    FROM user_profiles up
-    LEFT JOIN auth_login_events le ON le.user_id = up.id
-    GROUP BY up.id, up.first_name, up.last_name, up.email, up.profile_image_url
-    ORDER BY MAX(le.logged_in_at) DESC NULLS LAST, up.created_at DESC
+      la.last_login_at::text,
+      GREATEST(
+        COALESCE(la.last_login_at, to_timestamp(0)),
+        COALESCE(wa.last_weight_at, to_timestamp(0)),
+        COALESCE(fa.last_food_at, to_timestamp(0)),
+        COALESCE(woa.last_water_at, to_timestamp(0)),
+        COALESCE(ra.last_recipe_at, to_timestamp(0)),
+        COALESCE(ca.last_chat_at, to_timestamp(0))
+      )::text AS last_activity_at,
+      COALESCE(la.logins_today, 0)::int AS logins_today,
+      COALESCE(wa.weight_entries, 0)::int AS weight_entries,
+      COALESCE(fa.food_logs, 0)::int AS food_logs,
+      COALESCE(woa.water_logs, 0)::int AS water_logs,
+      COALESCE(ra.recipes, 0)::int AS recipes,
+      COALESCE(ca.chat_messages, 0)::int AS chat_messages
+    FROM all_user_ids au
+    LEFT JOIN user_profiles up ON up.id = au.user_id
+    LEFT JOIN login_agg la ON la.user_id = au.user_id
+    LEFT JOIN weight_agg wa ON wa.user_id = au.user_id
+    LEFT JOIN food_agg fa ON fa.user_id = au.user_id
+    LEFT JOIN water_agg woa ON woa.user_id = au.user_id
+    LEFT JOIN recipe_agg ra ON ra.user_id = au.user_id
+    LEFT JOIN chat_agg ca ON ca.user_id = au.user_id
+    ORDER BY
+      GREATEST(
+        COALESCE(la.last_login_at, to_timestamp(0)),
+        COALESCE(wa.last_weight_at, to_timestamp(0)),
+        COALESCE(fa.last_food_at, to_timestamp(0)),
+        COALESCE(woa.last_water_at, to_timestamp(0)),
+        COALESCE(ra.last_recipe_at, to_timestamp(0)),
+        COALESCE(ca.last_chat_at, to_timestamp(0))
+      ) DESC,
+      au.user_id DESC
   `) as AdminUserRow[];
 
   const daily = (await sql`
@@ -50,11 +141,50 @@ export default async function AdminPage() {
     ORDER BY day DESC
   `) as DailyRow[];
 
+  const [totals] = (await sql`
+    WITH all_user_ids AS (
+      SELECT id AS user_id FROM user_profiles
+      UNION
+      SELECT user_id FROM weight_entries
+      UNION
+      SELECT user_id FROM food_log_entries
+      UNION
+      SELECT user_id FROM water_log_entries
+      UNION
+      SELECT user_id FROM recipes
+      UNION
+      SELECT user_id FROM chat_messages
+      UNION
+      SELECT user_id FROM auth_login_events
+    )
+    SELECT
+      (SELECT COUNT(*) FROM all_user_ids)::int AS users,
+      (SELECT COUNT(*) FROM user_profiles)::int AS profiles,
+      (SELECT COUNT(*) FROM weight_entries)::int AS weight_entries,
+      (SELECT COUNT(*) FROM food_log_entries)::int AS food_logs,
+      (SELECT COUNT(*) FROM water_log_entries)::int AS water_logs,
+      (SELECT COUNT(*) FROM recipes)::int AS recipes,
+      (SELECT COUNT(*) FROM chat_messages)::int AS chat_messages
+  `) as GlobalTotals[];
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Admin</h1>
-        <p className="text-sm text-muted-foreground mt-1">User activity and login metrics.</p>
+        <p className="text-sm text-muted-foreground mt-1">All users and full database activity across the app.</p>
+      </div>
+
+      <div className="rounded-xl border bg-card p-4">
+        <h2 className="font-semibold mb-3">Global Totals</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+          <div className="rounded-lg border p-3"><p className="text-muted-foreground">Users</p><p className="font-semibold">{totals?.users ?? 0}</p></div>
+          <div className="rounded-lg border p-3"><p className="text-muted-foreground">Profiles</p><p className="font-semibold">{totals?.profiles ?? 0}</p></div>
+          <div className="rounded-lg border p-3"><p className="text-muted-foreground">Weight Logs</p><p className="font-semibold">{totals?.weight_entries ?? 0}</p></div>
+          <div className="rounded-lg border p-3"><p className="text-muted-foreground">Food Logs</p><p className="font-semibold">{totals?.food_logs ?? 0}</p></div>
+          <div className="rounded-lg border p-3"><p className="text-muted-foreground">Water Logs</p><p className="font-semibold">{totals?.water_logs ?? 0}</p></div>
+          <div className="rounded-lg border p-3"><p className="text-muted-foreground">Recipes</p><p className="font-semibold">{totals?.recipes ?? 0}</p></div>
+          <div className="rounded-lg border p-3"><p className="text-muted-foreground">Chat Messages</p><p className="font-semibold">{totals?.chat_messages ?? 0}</p></div>
+        </div>
       </div>
 
       <div className="rounded-xl border bg-card p-4">
@@ -98,6 +228,18 @@ export default async function AdminPage() {
                   Last login:{" "}
                   <span className="font-medium text-foreground">
                     {u.last_login_at ? new Date(u.last_login_at).toLocaleString() : "Never"}
+                  </span>
+                </p>
+                <p>
+                  Last activity:{" "}
+                  <span className="font-medium text-foreground">
+                    {u.last_activity_at ? new Date(u.last_activity_at).toLocaleString() : "Never"}
+                  </span>
+                </p>
+                <p className="mt-1">
+                  Data:{" "}
+                  <span className="font-medium text-foreground">
+                    W {u.weight_entries} | F {u.food_logs} | H2O {u.water_logs} | R {u.recipes} | C {u.chat_messages}
                   </span>
                 </p>
               </div>
