@@ -1,18 +1,11 @@
 "use client";
 
 import { DailyMacroTotals } from "@/types";
-
-const GOALS = {
-  calories: 2100,
-  protein_g: 180,
-  carbs_g: 170,
-  fat_g: 75,
-  fiber_g: 30,
-  sodium_mg: 2300,
-};
+import { DEFAULT_MACRO_GOALS, type MacroGoals } from "@/lib/goals";
 
 interface Props {
   totals: DailyMacroTotals;
+  goals?: MacroGoals;
 }
 
 function MacroRow({
@@ -47,48 +40,48 @@ function MacroRow({
   );
 }
 
-export function MacroProgressBars({ totals }: Props) {
+export function MacroProgressBars({ totals, goals = DEFAULT_MACRO_GOALS }: Props) {
   return (
     <div className="space-y-3">
       <MacroRow
         label="Calories"
         value={totals.calories}
-        goal={GOALS.calories}
+        goal={goals.calories}
         unit="kcal"
         color="bg-orange-500"
       />
       <MacroRow
         label="Protein"
         value={totals.protein_g}
-        goal={GOALS.protein_g}
+        goal={goals.protein_g}
         unit="g"
         color="bg-blue-500"
       />
       <MacroRow
         label="Carbs"
         value={totals.carbs_g}
-        goal={GOALS.carbs_g}
+        goal={goals.carbs_g}
         unit="g"
         color="bg-yellow-500"
       />
       <MacroRow
         label="Fat"
         value={totals.fat_g}
-        goal={GOALS.fat_g}
+        goal={goals.fat_g}
         unit="g"
         color="bg-red-500"
       />
       <MacroRow
         label="Fiber"
         value={totals.fiber_g}
-        goal={GOALS.fiber_g}
+        goal={goals.fiber_g}
         unit="g"
         color="bg-green-500"
       />
       <MacroRow
         label="Sodium"
         value={totals.sodium_mg}
-        goal={GOALS.sodium_mg}
+        goal={goals.sodium_mg}
         unit="mg"
         color="bg-cyan-500"
       />

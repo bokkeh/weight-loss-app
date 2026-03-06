@@ -5,6 +5,10 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { WeeklyWeightChart } from "@/components/dashboard/WeeklyWeightChart";
 import { WeeklyCaloriesChart } from "@/components/dashboard/WeeklyCaloriesChart";
 import { MacroDonutChart } from "@/components/dashboard/MacroDonutChart";
@@ -27,6 +31,7 @@ import {
   CloudLightning,
 } from "lucide-react";
 import { localDateStr } from "@/lib/utils";
+import { DEFAULT_MACRO_GOALS, goalsFromProfile } from "@/lib/goals";
 
 const GUT_TIP_VARIANTS: string[][] = [
   [
@@ -133,10 +138,25 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [calorieGoal, setCalorieGoal] = useState(2100);
+  const [macroGoals, setMacroGoals] = useState(DEFAULT_MACRO_GOALS);
   const [gutTipIndex, setGutTipIndex] = useState(0);
   const [firstName, setFirstName] = useState("there");
   const [profileImageUrl, setProfileImageUrl] = useState("");
   const [weather, setWeather] = useState<{ tempF: number; code: number } | null>(null);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [onboardingSaving, setOnboardingSaving] = useState(false);
+  const [onboardingForm, setOnboardingForm] = useState({
+    height_in: "",
+    current_weight_lbs: "",
+    goal_weight_lbs: "",
+    dietary_restrictions: "",
+    calorie_goal: String(DEFAULT_MACRO_GOALS.calories),
+    protein_goal_g: String(DEFAULT_MACRO_GOALS.protein_g),
+    carbs_goal_g: String(DEFAULT_MACRO_GOALS.carbs_g),
+    fat_goal_g: String(DEFAULT_MACRO_GOALS.fat_g),
+    fiber_goal_g: String(DEFAULT_MACRO_GOALS.fiber_g),
+    sodium_goal_mg: String(DEFAULT_MACRO_GOALS.sodium_mg),
+  });
 
   useEffect(() => {
     const saved = localStorage.getItem("calorieGoal");
@@ -174,6 +194,28 @@ export default function DashboardPage() {
       if (p?.profile_image_url) {
         setProfileImageUrl(String(p.profile_image_url));
       }
+      if (p) {
+        const goals = goalsFromProfile(p);
+        setMacroGoals(goals);
+        setCalorieGoal(goals.calories);
+        setOnboardingForm((prev) => ({
+          ...prev,
+          calorie_goal: String(goals.calories),
+          protein_goal_g: String(goals.protein_g),
+          carbs_goal_g: String(goals.carbs_g),
+          fat_goal_g: String(goals.fat_g),
+          fiber_goal_g: String(goals.fiber_g),
+          sodium_goal_mg: String(goals.sodium_mg),
+          height_in: p.height_in != null ? String(p.height_in) : prev.height_in,
+          goal_weight_lbs: p.goal_weight_lbs != null ? String(p.goal_weight_lbs) : prev.goal_weight_lbs,
+          dietary_restrictions: Array.isArray(p.dietary_restrictions)
+            ? p.dietary_restrictions.join(", ")
+            : prev.dietary_restrictions,
+        }));
+        if (!p.onboarding_completed) {
+          setOnboardingOpen(true);
+        }
+      }
       if (!s.error) {
         setStreak(s.streak ?? 0);
         setWeeklyAvgCalories(s.weeklyAvgCalories ?? null);
@@ -208,6 +250,76 @@ export default function DashboardPage() {
       fetchWeather(41.8781, -87.6298).catch(() => undefined);
     }
   }, []);
+
+  function onboardingFieldChange<K extends keyof typeof onboardingForm>(key: K, value: string) {
+    setOnboardingForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function toNumberOrNull(value: string): number | null {
+    if (!value.trim()) return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  async function handleOnboardingSave() {
+    setOnboardingSaving(true);
+    try {
+      const restrictions = onboardingForm.dietary_restrictions
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+      const profileRes = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dietary_restrictions: restrictions,
+          calorie_goal: toNumberOrNull(onboardingForm.calorie_goal),
+          protein_goal_g: toNumberOrNull(onboardingForm.protein_goal_g),
+          carbs_goal_g: toNumberOrNull(onboardingForm.carbs_goal_g),
+          fat_goal_g: toNumberOrNull(onboardingForm.fat_goal_g),
+          fiber_goal_g: toNumberOrNull(onboardingForm.fiber_goal_g),
+          sodium_goal_mg: toNumberOrNull(onboardingForm.sodium_goal_mg),
+          height_in: toNumberOrNull(onboardingForm.height_in),
+          goal_weight_lbs: toNumberOrNull(onboardingForm.goal_weight_lbs),
+          onboarding_completed: true,
+        }),
+      });
+
+      if (!profileRes.ok) {
+        throw new Error("Failed to save onboarding profile.");
+      }
+
+      const currentWeight = toNumberOrNull(onboardingForm.current_weight_lbs);
+      if (currentWeight && currentWeight > 0) {
+        await fetch("/api/weight", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            logged_at: localDateStr(),
+            weight_lbs: currentWeight,
+            time_of_day: "morning",
+            note: "Initial onboarding entry",
+          }),
+        });
+      }
+
+      const cals = toNumberOrNull(onboardingForm.calorie_goal);
+      if (cals && cals > 0) {
+        setCalorieGoal(cals);
+      }
+      setMacroGoals({
+        calories: toNumberOrNull(onboardingForm.calorie_goal) ?? DEFAULT_MACRO_GOALS.calories,
+        protein_g: toNumberOrNull(onboardingForm.protein_goal_g) ?? DEFAULT_MACRO_GOALS.protein_g,
+        carbs_g: toNumberOrNull(onboardingForm.carbs_goal_g) ?? DEFAULT_MACRO_GOALS.carbs_g,
+        fat_g: toNumberOrNull(onboardingForm.fat_goal_g) ?? DEFAULT_MACRO_GOALS.fat_g,
+        fiber_g: toNumberOrNull(onboardingForm.fiber_goal_g) ?? DEFAULT_MACRO_GOALS.fiber_g,
+        sodium_mg: toNumberOrNull(onboardingForm.sodium_goal_mg) ?? DEFAULT_MACRO_GOALS.sodium_mg,
+      });
+      setOnboardingOpen(false);
+    } finally {
+      setOnboardingSaving(false);
+    }
+  }
 
   async function handleGenerateSummary() {
     setSummaryLoading(true);
@@ -247,6 +359,67 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <Dialog open={onboardingOpen} onOpenChange={() => undefined}>
+        <DialogContent className="max-w-xl" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Welcome - set up your goals</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="onboard-height">Height (inches)</Label>
+                <Input id="onboard-height" type="number" min={1} value={onboardingForm.height_in} onChange={(e) => onboardingFieldChange("height_in", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="onboard-current-weight">Current Weight (lbs)</Label>
+                <Input id="onboard-current-weight" type="number" min={1} value={onboardingForm.current_weight_lbs} onChange={(e) => onboardingFieldChange("current_weight_lbs", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="onboard-goal-weight">Goal Weight (lbs)</Label>
+                <Input id="onboard-goal-weight" type="number" min={1} value={onboardingForm.goal_weight_lbs} onChange={(e) => onboardingFieldChange("goal_weight_lbs", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="onboard-calories">Daily Calories</Label>
+                <Input id="onboard-calories" type="number" min={1} value={onboardingForm.calorie_goal} onChange={(e) => onboardingFieldChange("calorie_goal", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="onboard-protein">Protein Goal (g)</Label>
+                <Input id="onboard-protein" type="number" min={1} value={onboardingForm.protein_goal_g} onChange={(e) => onboardingFieldChange("protein_goal_g", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="onboard-carbs">Carbs Goal (g)</Label>
+                <Input id="onboard-carbs" type="number" min={1} value={onboardingForm.carbs_goal_g} onChange={(e) => onboardingFieldChange("carbs_goal_g", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="onboard-fat">Fat Goal (g)</Label>
+                <Input id="onboard-fat" type="number" min={1} value={onboardingForm.fat_goal_g} onChange={(e) => onboardingFieldChange("fat_goal_g", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="onboard-fiber">Fiber Goal (g)</Label>
+                <Input id="onboard-fiber" type="number" min={1} value={onboardingForm.fiber_goal_g} onChange={(e) => onboardingFieldChange("fiber_goal_g", e.target.value)} />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label htmlFor="onboard-sodium">Sodium Goal (mg)</Label>
+                <Input id="onboard-sodium" type="number" min={1} value={onboardingForm.sodium_goal_mg} onChange={(e) => onboardingFieldChange("sodium_goal_mg", e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="onboard-restrictions">Dietary Restrictions</Label>
+              <Textarea
+                id="onboard-restrictions"
+                rows={3}
+                placeholder="e.g. dairy-free, gluten-free"
+                value={onboardingForm.dietary_restrictions}
+                onChange={(e) => onboardingFieldChange("dietary_restrictions", e.target.value)}
+              />
+            </div>
+            <Button type="button" onClick={handleOnboardingSave} disabled={onboardingSaving} className="w-full">
+              {onboardingSaving ? "Saving..." : "Save and Continue"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
@@ -320,7 +493,7 @@ export default function DashboardPage() {
           <StatCard
             title="Today's Protein"
             value={`${todayTotals.protein_g.toFixed(0)}g`}
-            subtitle="Goal: 180g"
+            subtitle={`Goal: ${macroGoals.protein_g.toFixed(0)}g`}
             icon={<Beef className="h-5 w-5 text-purple-600" />}
             color="bg-purple-50 dark:bg-purple-950"
           />
@@ -397,7 +570,7 @@ export default function DashboardPage() {
             {loading ? (
               <Skeleton className="h-48 w-full" />
             ) : hasAnyMealsLogged ? (
-              <WeeklyCaloriesChart entries={foodEntries} />
+              <WeeklyCaloriesChart entries={foodEntries} calorieGoal={calorieGoal} />
             ) : (
               <FirstMealWidgetPlaceholder />
             )}

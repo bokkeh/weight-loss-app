@@ -16,6 +16,14 @@ interface ProfileForm {
   phone: string;
   dietary_restrictions: string;
   profile_image_url: string;
+  calorie_goal: string;
+  protein_goal_g: string;
+  carbs_goal_g: string;
+  fat_goal_g: string;
+  fiber_goal_g: string;
+  sodium_goal_mg: string;
+  height_in: string;
+  goal_weight_lbs: string;
 }
 
 export default function ProfilePage() {
@@ -26,6 +34,14 @@ export default function ProfilePage() {
     phone: "",
     dietary_restrictions: "",
     profile_image_url: "",
+    calorie_goal: "2100",
+    protein_goal_g: "180",
+    carbs_goal_g: "170",
+    fat_goal_g: "75",
+    fiber_goal_g: "30",
+    sodium_goal_mg: "2300",
+    height_in: "",
+    goal_weight_lbs: "",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -57,6 +73,14 @@ export default function ProfilePage() {
           phone: profile.phone ?? "",
           dietary_restrictions: (profile.dietary_restrictions ?? []).join(", "),
           profile_image_url: profile.profile_image_url ?? "",
+          calorie_goal: profile.calorie_goal != null ? String(profile.calorie_goal) : "2100",
+          protein_goal_g: profile.protein_goal_g != null ? String(profile.protein_goal_g) : "180",
+          carbs_goal_g: profile.carbs_goal_g != null ? String(profile.carbs_goal_g) : "170",
+          fat_goal_g: profile.fat_goal_g != null ? String(profile.fat_goal_g) : "75",
+          fiber_goal_g: profile.fiber_goal_g != null ? String(profile.fiber_goal_g) : "30",
+          sodium_goal_mg: profile.sodium_goal_mg != null ? String(profile.sodium_goal_mg) : "2300",
+          height_in: profile.height_in != null ? String(profile.height_in) : "",
+          goal_weight_lbs: profile.goal_weight_lbs != null ? String(profile.goal_weight_lbs) : "",
         });
       } catch (err) {
         setMessage(err instanceof Error ? err.message : "Failed to load profile");
@@ -111,6 +135,15 @@ export default function ProfilePage() {
           phone: form.phone.trim() || null,
           dietary_restrictions: restrictions,
           profile_image_url: form.profile_image_url.trim() || null,
+          calorie_goal: form.calorie_goal ? Number(form.calorie_goal) : null,
+          protein_goal_g: form.protein_goal_g ? Number(form.protein_goal_g) : null,
+          carbs_goal_g: form.carbs_goal_g ? Number(form.carbs_goal_g) : null,
+          fat_goal_g: form.fat_goal_g ? Number(form.fat_goal_g) : null,
+          fiber_goal_g: form.fiber_goal_g ? Number(form.fiber_goal_g) : null,
+          sodium_goal_mg: form.sodium_goal_mg ? Number(form.sodium_goal_mg) : null,
+          height_in: form.height_in ? Number(form.height_in) : null,
+          goal_weight_lbs: form.goal_weight_lbs ? Number(form.goal_weight_lbs) : null,
+          onboarding_completed: true,
         }),
       });
       const raw = await res.text().catch(() => "");
@@ -186,6 +219,50 @@ export default function ProfilePage() {
                 rows={3}
               />
               <p className="text-xs text-muted-foreground">Comma separated list.</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Daily Macro Goals</p>
+              <div className="grid sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="calorie_goal">Calories</Label>
+                  <Input id="calorie_goal" type="number" min={1} value={form.calorie_goal} onChange={(e) => setField("calorie_goal", e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="protein_goal_g">Protein (g)</Label>
+                  <Input id="protein_goal_g" type="number" min={1} value={form.protein_goal_g} onChange={(e) => setField("protein_goal_g", e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="carbs_goal_g">Carbs (g)</Label>
+                  <Input id="carbs_goal_g" type="number" min={1} value={form.carbs_goal_g} onChange={(e) => setField("carbs_goal_g", e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="fat_goal_g">Fat (g)</Label>
+                  <Input id="fat_goal_g" type="number" min={1} value={form.fat_goal_g} onChange={(e) => setField("fat_goal_g", e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="fiber_goal_g">Fiber (g)</Label>
+                  <Input id="fiber_goal_g" type="number" min={1} value={form.fiber_goal_g} onChange={(e) => setField("fiber_goal_g", e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="sodium_goal_mg">Sodium (mg)</Label>
+                  <Input id="sodium_goal_mg" type="number" min={1} value={form.sodium_goal_mg} onChange={(e) => setField("sodium_goal_mg", e.target.value)} />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Body Targets</p>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="height_in">Height (inches)</Label>
+                  <Input id="height_in" type="number" min={1} value={form.height_in} onChange={(e) => setField("height_in", e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="goal_weight_lbs">Goal Weight (lbs)</Label>
+                  <Input id="goal_weight_lbs" type="number" min={1} value={form.goal_weight_lbs} onChange={(e) => setField("goal_weight_lbs", e.target.value)} />
+                </div>
+              </div>
             </div>
 
             {message && <p className="text-sm text-muted-foreground">{message}</p>}

@@ -102,6 +102,15 @@ export async function POST(req: Request) {
         phone                 TEXT,
         profile_image_url     TEXT,
         dietary_restrictions  TEXT[],
+        calorie_goal          NUMERIC,
+        protein_goal_g        NUMERIC,
+        carbs_goal_g          NUMERIC,
+        fat_goal_g            NUMERIC,
+        fiber_goal_g          NUMERIC,
+        sodium_goal_mg        NUMERIC,
+        height_in             NUMERIC,
+        goal_weight_lbs       NUMERIC,
+        onboarding_completed  BOOLEAN NOT NULL DEFAULT FALSE,
         created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
@@ -162,6 +171,16 @@ export async function POST(req: Request) {
         ON user_profiles (LOWER(email))
         WHERE email IS NOT NULL
     `;
+
+    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS calorie_goal NUMERIC`;
+    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS protein_goal_g NUMERIC`;
+    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS carbs_goal_g NUMERIC`;
+    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fat_goal_g NUMERIC`;
+    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fiber_goal_g NUMERIC`;
+    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS sodium_goal_mg NUMERIC`;
+    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS height_in NUMERIC`;
+    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS goal_weight_lbs NUMERIC`;
+    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE`;
 
     await sql`
       CREATE INDEX IF NOT EXISTS idx_auth_login_events_user_time

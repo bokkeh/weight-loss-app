@@ -19,9 +19,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FoodLogEntry, DailyMacroTotals } from "@/types";
 import { shareOrCopy } from "@/lib/shareUtils";
 import { localDateStr } from "@/lib/utils";
+import { DEFAULT_MACRO_GOALS, goalsFromProfile, type MacroGoals } from "@/lib/goals";
 import Link from "next/link";
-
-const GOALS = { calories: 2100, protein_g: 180, carbs_g: 170, fat_g: 75, fiber_g: 30, sodium_mg: 2300 };
 
 const MEAL_EMOJI: Record<string, string> = {
   breakfast: "ðŸ³",
@@ -61,7 +60,7 @@ function getEntryTimestamp(entry: FoodLogEntry): number {
   return Number.isNaN(fallbackMs) ? 0 : fallbackMs;
 }
 
-function buildShareText(entries: FoodLogEntry[], date: Date): string {
+function buildShareText(entries: FoodLogEntry[], date: Date, goals: MacroGoals): string {
   const dateLabel = date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   const lines: string[] = [`ðŸ“Š Food Log â€” ${dateLabel}`, ""];
 
@@ -81,9 +80,7 @@ function buildShareText(entries: FoodLogEntry[], date: Date): string {
 
   const totals = sumMacros(entries);
   lines.push("ðŸ“ˆ Daily Totals");
-  lines.push(
-    `Calories: ${totals.calories.toFixed(0)} / ${GOALS.calories} | Protein: ${totals.protein_g.toFixed(1)}g / ${GOALS.protein_g}g | Carbs: ${totals.carbs_g.toFixed(1)}g / ${GOALS.carbs_g}g | Fat: ${totals.fat_g.toFixed(1)}g / ${GOALS.fat_g}g | Fiber: ${totals.fiber_g.toFixed(1)}g / ${GOALS.fiber_g}g | Sodium: ${totals.sodium_mg.toFixed(0)}mg / ${GOALS.sodium_mg}mg`
-  );
+  lines.push(`Calories: ${totals.calories.toFixed(0)} / ${goals.calories} | Protein: ${totals.protein_g.toFixed(1)}g / ${goals.protein_g}g | Carbs: ${totals.carbs_g.toFixed(1)}g / ${goals.carbs_g}g | Fat: ${totals.fat_g.toFixed(1)}g / ${goals.fat_g}g | Fiber: ${totals.fiber_g.toFixed(1)}g / ${goals.fiber_g}g | Sodium: ${totals.sodium_mg.toFixed(0)}mg / ${goals.sodium_mg}mg`);
 
   return lines.join("\n");
 }
@@ -106,7 +103,7 @@ function isHealthyForMeal(entry: FoodLogEntry, meal: "breakfast" | "lunch" | "di
   return calories >= 250 && calories <= 750 && protein >= 20 && sodium <= 900;
 }
 
-function buildMealIdeas(todayEntries: FoodLogEntry[], recentEntries: FoodLogEntry[]): string[] {
+function buildMealIdeas(todayEntries: FoodLogEntry[], recentEntries: FoodLogEntry[], goals: MacroGoals): string[] {
   const now = new Date();
   const targetMeal = targetMealForHour(now.getHours());
   const mealOrder: Array<"breakfast" | "lunch" | "dinner" | "snack"> = [
@@ -131,9 +128,9 @@ function buildMealIdeas(todayEntries: FoodLogEntry[], recentEntries: FoodLogEntr
     .sort((a, b) => getEntryTimestamp(b) - getEntryTimestamp(a));
 
   const todayTotals = sumMacros(todayEntries);
-  const proteinLeft = Math.max(0, GOALS.protein_g - todayTotals.protein_g);
-  const fiberLeft = Math.max(0, GOALS.fiber_g - todayTotals.fiber_g);
-  const caloriesLeft = Math.max(0, GOALS.calories - todayTotals.calories);
+  const proteinLeft = Math.max(0, goals.protein_g - todayTotals.protein_g);
+  const fiberLeft = Math.max(0, goals.fiber_g - todayTotals.fiber_g);
+  const caloriesLeft = Math.max(0, goals.calories - todayTotals.calories);
 
   const candidates = recent72.filter(
     (e) => (e.meal_type === nextMeal || e.meal_type === "snack") && isHealthyForMeal(e, nextMeal)
@@ -280,7 +277,7 @@ function buildFrequentFoods(entries: FoodLogEntry[]): FrequentFood[] {
     .slice(0, 8);
 }
 
-async function buildGoalsSnapshotImage(totals: DailyMacroTotals, date: Date): Promise<File> {
+async function buildGoalsSnapshotImage(totals: DailyMacroTotals, date: Date, goals: MacroGoals): Promise<File> {
   const width = 1080;
   const height = 1320;
   const canvas = document.createElement("canvas");
@@ -305,12 +302,12 @@ async function buildGoalsSnapshotImage(totals: DailyMacroTotals, date: Date): Pr
   );
 
   const rows = [
-    { label: "Calories", value: totals.calories, goal: GOALS.calories, unit: "kcal", color: "#f97316" },
-    { label: "Protein", value: totals.protein_g, goal: GOALS.protein_g, unit: "g", color: "#3b82f6" },
-    { label: "Carbs", value: totals.carbs_g, goal: GOALS.carbs_g, unit: "g", color: "#eab308" },
-    { label: "Fat", value: totals.fat_g, goal: GOALS.fat_g, unit: "g", color: "#ef4444" },
-    { label: "Fiber", value: totals.fiber_g, goal: GOALS.fiber_g, unit: "g", color: "#22c55e" },
-    { label: "Sodium", value: totals.sodium_mg, goal: GOALS.sodium_mg, unit: "mg", color: "#06b6d4" },
+    { label: "Calories", value: totals.calories, goal: goals.calories, unit: "kcal", color: "#f97316" },
+    { label: "Protein", value: totals.protein_g, goal: goals.protein_g, unit: "g", color: "#3b82f6" },
+    { label: "Carbs", value: totals.carbs_g, goal: goals.carbs_g, unit: "g", color: "#eab308" },
+    { label: "Fat", value: totals.fat_g, goal: goals.fat_g, unit: "g", color: "#ef4444" },
+    { label: "Fiber", value: totals.fiber_g, goal: goals.fiber_g, unit: "g", color: "#22c55e" },
+    { label: "Sodium", value: totals.sodium_mg, goal: goals.sodium_mg, unit: "mg", color: "#06b6d4" },
   ];
 
   let y = 240;
@@ -358,6 +355,7 @@ export default function FoodLogPage() {
   const [goalsShareLabel, setGoalsShareLabel] = useState<"share" | "done">("share");
   const [mealIdeaIndex, setMealIdeaIndex] = useState(0);
   const [quickAddingKey, setQuickAddingKey] = useState<string | null>(null);
+  const [goals, setGoals] = useState<MacroGoals>(DEFAULT_MACRO_GOALS);
 
   const today = new Date();
   const isToday = toDateStr(selectedDate) === toDateStr(today);
@@ -385,6 +383,17 @@ export default function FoodLogPage() {
     fetchEntries();
   }, [fetchEntries]);
 
+  useEffect(() => {
+    async function loadGoals() {
+      const res = await fetch("/api/profile");
+      const profile = await readJsonSafe<Record<string, unknown>>(res);
+      if (res.ok && profile) {
+        setGoals(goalsFromProfile(profile));
+      }
+    }
+    loadGoals().catch(() => undefined);
+  }, []);
+
   function handleAdded(entry: FoodLogEntry) {
     setEntries((prev) => [...prev, entry]);
     setRecentEntries((prev) => [entry, ...prev]);
@@ -403,14 +412,14 @@ export default function FoodLogPage() {
   }
 
   async function handleShare() {
-    const text = buildShareText(entries, selectedDate);
+    const text = buildShareText(entries, selectedDate, goals);
     await shareOrCopy(text, "Food Log");
     setShareLabel("done");
     setTimeout(() => setShareLabel("share"), 2000);
   }
 
   async function handleShareGoalsSnapshot() {
-    const file = await buildGoalsSnapshotImage(totals, selectedDate);
+    const file = await buildGoalsSnapshotImage(totals, selectedDate, goals);
     const nav = navigator as Navigator & {
       canShare?: (data: { files?: File[] }) => boolean;
     };
@@ -470,7 +479,7 @@ export default function FoodLogPage() {
   }
 
   const totals = sumMacros(entries);
-  const mealIdeas = buildMealIdeas(entries, recentEntries);
+  const mealIdeas = buildMealIdeas(entries, recentEntries, goals);
   const currentMealIdea = mealIdeas[Math.min(mealIdeaIndex, Math.max(0, mealIdeas.length - 1))] ?? "";
   const frequentFoods = buildFrequentFoods(recentEntries);
   const isFirstMealExperience = recentEntries.length === 0;
@@ -664,10 +673,10 @@ export default function FoodLogPage() {
               ) : isFirstMealExperience ? (
                 <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground space-y-2">
                   <p>No meals logged yet. Your progress bars will populate after your first entry.</p>
-                  <p>Daily targets: 2100 kcal, 180g protein, 170g carbs, 75g fat, 30g fiber, 2300mg sodium.</p>
+                  <p>Daily targets: {goals.calories.toFixed(0)} kcal, {goals.protein_g.toFixed(0)}g protein, {goals.carbs_g.toFixed(0)}g carbs, {goals.fat_g.toFixed(0)}g fat, {goals.fiber_g.toFixed(0)}g fiber, {goals.sodium_mg.toFixed(0)}mg sodium.</p>
                 </div>
               ) : (
-                <MacroProgressBars totals={totals} />
+                <MacroProgressBars totals={totals} goals={goals} />
               )}
             </CardContent>
           </Card>

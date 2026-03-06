@@ -77,15 +77,18 @@ export default function WeightPage() {
   const [weeks, setWeeks] = useState("12");
   const [loading, setLoading] = useState(true);
   const [shareLabel, setShareLabel] = useState<"share" | "done">("share");
-  const [goalWeight, setGoalWeight] = useState<number | null>(() => {
-    if (typeof window === "undefined") return null;
-    const v = localStorage.getItem("goalWeight");
-    return v ? parseFloat(v) : null;
-  });
+  const [goalWeight, setGoalWeight] = useState<number | null>(null);
 
-  function handleGoalSet(goal: number) {
+  async function handleGoalSet(goal: number) {
     setGoalWeight(goal);
-    localStorage.setItem("goalWeight", String(goal));
+    await fetch("/api/profile", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        goal_weight_lbs: goal,
+        onboarding_completed: true,
+      }),
+    });
   }
 
   const fetchEntries = useCallback(async () => {
@@ -102,6 +105,17 @@ export default function WeightPage() {
   useEffect(() => {
     fetchEntries();
   }, [fetchEntries]);
+
+  useEffect(() => {
+    async function loadGoal() {
+      const res = await fetch("/api/profile");
+      const profile = (await res.json().catch(() => null)) as { goal_weight_lbs?: number | null } | null;
+      if (res.ok && profile?.goal_weight_lbs != null) {
+        setGoalWeight(Number(profile.goal_weight_lbs));
+      }
+    }
+    loadGoal().catch(() => undefined);
+  }, []);
 
   function handleAdded(entry: WeightEntry) {
     setEntries((prev) => [entry, ...prev]);

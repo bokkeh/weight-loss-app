@@ -58,6 +58,15 @@ export interface UserProfile {
   phone?: string;
   profile_image_url?: string;
   dietary_restrictions?: string[];
+  calorie_goal?: number;
+  protein_goal_g?: number;
+  carbs_goal_g?: number;
+  fat_goal_g?: number;
+  fiber_goal_g?: number;
+  sodium_goal_mg?: number;
+  height_in?: number;
+  goal_weight_lbs?: number;
+  onboarding_completed?: boolean;
   created_at: string;
   updated_at: string;
 }
