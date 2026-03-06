@@ -86,10 +86,26 @@ async function ensureMultiUserSchemaInternal() {
     )
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS feature_requests (
+      id            SERIAL PRIMARY KEY,
+      user_id       INTEGER NOT NULL,
+      title         TEXT NOT NULL,
+      description   TEXT NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'open',
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
 
   await sql`
     CREATE INDEX IF NOT EXISTS idx_auth_login_events_user_time
       ON auth_login_events (user_id, logged_in_at DESC)
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_feature_requests_user_time
+      ON feature_requests (user_id, created_at DESC)
   `;
 
   // Optional analytics table for sign-in page traffic.

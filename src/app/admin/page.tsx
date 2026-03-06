@@ -31,6 +31,7 @@ interface GlobalTotals {
   historical_accounts: number;
   signin_page_views_14d: number;
   oauth_clicks_14d: number;
+  feature_requests: number;
   weight_entries: number;
   food_logs: number;
   water_logs: number;
@@ -44,6 +45,18 @@ interface HistoricalAccountRow {
   last_seen_at: string;
   login_count: number;
   providers: string[];
+}
+
+interface FeatureRequestRow {
+  id: number;
+  user_id: number;
+  title: string;
+  description: string;
+  status: string;
+  created_at: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
 }
 
 export default async function AdminPage() {
@@ -155,6 +168,17 @@ export default async function AdminPage() {
     ORDER BY day DESC
   `) as DailyRow[];
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS feature_requests (
+      id            SERIAL PRIMARY KEY,
+      user_id       INTEGER NOT NULL,
+      title         TEXT NOT NULL,
+      description   TEXT NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'open',
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
   const [totals] = (await sql`
     WITH all_user_ids AS (
       SELECT id AS user_id FROM user_profiles
@@ -193,12 +217,30 @@ export default async function AdminPage() {
         WHERE event_type = 'oauth_click'
           AND created_at >= CURRENT_DATE - INTERVAL '14 days'
       ) AS oauth_clicks_14d,
+      (SELECT COUNT(*)::int FROM feature_requests) AS feature_requests,
       (SELECT COUNT(*) FROM weight_entries)::int AS weight_entries,
       (SELECT COUNT(*) FROM food_log_entries)::int AS food_logs,
       (SELECT COUNT(*) FROM water_log_entries)::int AS water_logs,
       (SELECT COUNT(*) FROM recipes)::int AS recipes,
       (SELECT COUNT(*) FROM chat_messages)::int AS chat_messages
   `) as GlobalTotals[];
+
+  const featureRequests = (await sql`
+    SELECT
+      fr.id,
+      fr.user_id,
+      fr.title,
+      fr.description,
+      fr.status,
+      fr.created_at::text,
+      up.first_name,
+      up.last_name,
+      up.email
+    FROM feature_requests fr
+    LEFT JOIN user_profiles up ON up.id = fr.user_id
+    ORDER BY fr.created_at DESC
+    LIMIT 200
+  `) as FeatureRequestRow[];
 
   const signinTraffic = (await sql`
     SELECT
@@ -239,6 +281,7 @@ export default async function AdminPage() {
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Historical Accounts</p><p className="font-semibold">{totals?.historical_accounts ?? 0}</p></div>
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Sign-In Page Views (14d)</p><p className="font-semibold">{totals?.signin_page_views_14d ?? 0}</p></div>
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">OAuth Clicks (14d)</p><p className="font-semibold">{totals?.oauth_clicks_14d ?? 0}</p></div>
+          <div className="rounded-lg border p-3"><p className="text-muted-foreground">Feature Requests</p><p className="font-semibold">{totals?.feature_requests ?? 0}</p></div>
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Weight Logs</p><p className="font-semibold">{totals?.weight_entries ?? 0}</p></div>
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Food Logs</p><p className="font-semibold">{totals?.food_logs ?? 0}</p></div>
           <div className="rounded-lg border p-3"><p className="text-muted-foreground">Water Logs</p><p className="font-semibold">{totals?.water_logs ?? 0}</p></div>
@@ -323,6 +366,30 @@ export default async function AdminPage() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="rounded-xl border bg-card p-4">
+        <h2 className="font-semibold mb-3">Feature Requests</h2>
+        <div className="space-y-2">
+          {featureRequests.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No feature requests yet.</p>
+          ) : (
+            featureRequests.map((fr) => (
+              <div key={fr.id} className="border rounded-lg p-3 space-y-1">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-medium">{fr.title}</p>
+                  <span className="text-xs rounded-full border px-2 py-0.5 text-muted-foreground">{fr.status}</span>
+                </div>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{fr.description}</p>
+                <p className="text-xs text-muted-foreground">
+                  By {[fr.first_name, fr.last_name].filter(Boolean).join(" ") || "Unknown User"}
+                  {fr.email ? ` (${fr.email})` : ""}
+                  {` • ${new Date(fr.created_at).toLocaleString()}`}
+                </p>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

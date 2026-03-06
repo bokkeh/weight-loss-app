@@ -24,6 +24,7 @@ import {
   Download,
   LogOut,
   Shield,
+  Lightbulb,
 } from "lucide-react";
 import { FoodLogEntry, WeightEntry } from "@/types";
 
@@ -36,9 +37,11 @@ const tabs = [
 ];
 
 const profileTab = { href: "/profile", label: "Profile", icon: User };
+const featureRequestTab = { href: "/request-feature", label: "Request a Feature", icon: Lightbulb };
 
 const desktopTabs = [
   ...tabs,
+  featureRequestTab,
   { href: "/profile", label: "Profile", icon: User },
 ];
 
@@ -97,8 +100,8 @@ export function TabNav() {
     : desktopTabs;
 
   const mobileNavItems = isAdmin
-    ? [...tabs, profileTab, { href: "/admin", label: "Admin", icon: Shield }]
-    : [...tabs, profileTab];
+    ? [...tabs, featureRequestTab, profileTab, { href: "/admin", label: "Admin", icon: Shield }]
+    : [...tabs, featureRequestTab, profileTab];
 
   return (
     <>
