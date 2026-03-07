@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { isAdminEmail } from "@/lib/admin";
@@ -59,10 +60,31 @@ interface FeatureRequestRow {
   email: string | null;
 }
 
+function formatDateTime(value: string | null): string {
+  if (!value) return "Never";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime()) || parsed.getUTCFullYear() <= 1970) return "Never";
+  return parsed.toLocaleString();
+}
+
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
   if (!isAdminEmail(session?.user?.email)) {
     redirect("/dashboard");
+  }
+
+  async function closeFeatureRequest(formData: FormData) {
+    "use server";
+    const currentSession = await getServerSession(authOptions);
+    if (!isAdminEmail(currentSession?.user?.email)) return;
+    const id = Number(formData.get("id"));
+    if (!Number.isFinite(id) || id <= 0) return;
+    await sql`
+      UPDATE feature_requests
+      SET status = 'closed'
+      WHERE id = ${id}
+    `;
+    revalidatePath("/admin");
   }
 
   const users = (await sql`
@@ -124,13 +146,16 @@ export default async function AdminPage() {
       COALESCE(up.email, la.last_login_email) AS email,
       up.profile_image_url,
       la.last_login_at::text,
-      GREATEST(
-        COALESCE(la.last_login_at, to_timestamp(0)),
-        COALESCE(wa.last_weight_at, to_timestamp(0)),
-        COALESCE(fa.last_food_at, to_timestamp(0)),
-        COALESCE(woa.last_water_at, to_timestamp(0)),
-        COALESCE(ra.last_recipe_at, to_timestamp(0)),
-        COALESCE(ca.last_chat_at, to_timestamp(0))
+      NULLIF(
+        GREATEST(
+          COALESCE(la.last_login_at, to_timestamp(0)),
+          COALESCE(wa.last_weight_at, to_timestamp(0)),
+          COALESCE(fa.last_food_at, to_timestamp(0)),
+          COALESCE(woa.last_water_at, to_timestamp(0)),
+          COALESCE(ra.last_recipe_at, to_timestamp(0)),
+          COALESCE(ca.last_chat_at, to_timestamp(0))
+        ),
+        to_timestamp(0)
       )::text AS last_activity_at,
       COALESCE(la.logins_today, 0)::int AS logins_today,
       COALESCE(wa.weight_entries, 0)::int AS weight_entries,
@@ -241,6 +266,8 @@ export default async function AdminPage() {
     ORDER BY fr.created_at DESC
     LIMIT 200
   `) as FeatureRequestRow[];
+  const openFeatureRequests = featureRequests.filter((fr) => fr.status !== "closed");
+  const closedFeatureRequests = featureRequests.filter((fr) => fr.status === "closed");
 
   const signinTraffic = (await sql`
     SELECT
@@ -348,13 +375,13 @@ export default async function AdminPage() {
                 <p>
                   Last login:{" "}
                   <span className="font-medium text-foreground">
-                    {u.last_login_at ? new Date(u.last_login_at).toLocaleString() : "Never"}
+                    {formatDateTime(u.last_login_at)}
                   </span>
                 </p>
                 <p>
                   Last activity:{" "}
                   <span className="font-medium text-foreground">
-                    {u.last_activity_at ? new Date(u.last_activity_at).toLocaleString() : "Never"}
+                    {formatDateTime(u.last_activity_at)}
                   </span>
                 </p>
                 <p className="mt-1">
@@ -367,28 +394,67 @@ export default async function AdminPage() {
             </div>
           ))}
         </div>
-      </div>
-
-      <div className="rounded-xl border bg-card p-4">
+      </div>      <div className="rounded-xl border bg-card p-4">
         <h2 className="font-semibold mb-3">Feature Requests</h2>
         <div className="space-y-2">
           {featureRequests.length === 0 ? (
             <p className="text-sm text-muted-foreground">No feature requests yet.</p>
           ) : (
-            featureRequests.map((fr) => (
-              <div key={fr.id} className="border rounded-lg p-3 space-y-1">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="font-medium">{fr.title}</p>
-                  <span className="text-xs rounded-full border px-2 py-0.5 text-muted-foreground">{fr.status}</span>
+            <div className="space-y-3">
+              {openFeatureRequests.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Open</p>
+                  {openFeatureRequests.map((fr) => (
+                    <div key={fr.id} className="border rounded-lg p-3 space-y-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-medium">{fr.title}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs rounded-full border px-2 py-0.5 text-muted-foreground">{fr.status}</span>
+                          <form action={closeFeatureRequest}>
+                            <input type="hidden" name="id" value={fr.id} />
+                            <button type="submit" className="text-xs rounded-md border px-2 py-0.5 hover:bg-muted">
+                              Close
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{fr.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        By {[fr.first_name, fr.last_name].filter(Boolean).join(" ") || "Unknown User"}
+                        {fr.email ? ` (${fr.email})` : ""}
+                        {` | ${formatDateTime(fr.created_at)}`}
+                      </p>
+                    </div>
+                  ))}
                 </div>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{fr.description}</p>
-                <p className="text-xs text-muted-foreground">
-                  By {[fr.first_name, fr.last_name].filter(Boolean).join(" ") || "Unknown User"}
-                  {fr.email ? ` (${fr.email})` : ""}
-                  {` • ${new Date(fr.created_at).toLocaleString()}`}
-                </p>
-              </div>
-            ))
+              )}
+
+              <details className="rounded-lg border p-3">
+                <summary className="cursor-pointer text-sm font-medium">
+                  Closed ({closedFeatureRequests.length})
+                </summary>
+                <div className="mt-3 space-y-2">
+                  {closedFeatureRequests.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No closed requests yet.</p>
+                  ) : (
+                    closedFeatureRequests.map((fr) => (
+                      <div key={fr.id} className="border rounded-lg p-3 space-y-1 bg-muted/30">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="font-medium">{fr.title}</p>
+                          <span className="text-xs rounded-full border px-2 py-0.5 text-muted-foreground">{fr.status}</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{fr.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          By {[fr.first_name, fr.last_name].filter(Boolean).join(" ") || "Unknown User"}
+                          {fr.email ? ` (${fr.email})` : ""}
+                          {` | ${formatDateTime(fr.created_at)}`}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </details>
+            </div>
           )}
         </div>
       </div>
@@ -404,11 +470,11 @@ export default async function AdminPage() {
                 <div className="min-w-0">
                   <p className="font-medium truncate">{row.email}</p>
                   <p className="text-xs text-muted-foreground">
-                    First seen: {new Date(row.first_seen_at).toLocaleString()}
+                    First seen: {formatDateTime(row.first_seen_at)}
                   </p>
                 </div>
                 <div className="text-right text-xs text-muted-foreground shrink-0">
-                  <p>Last login: <span className="font-medium text-foreground">{new Date(row.last_seen_at).toLocaleString()}</span></p>
+                  <p>Last login: <span className="font-medium text-foreground">{formatDateTime(row.last_seen_at)}</span></p>
                   <p>Logins: <span className="font-medium text-foreground">{row.login_count}</span></p>
                   <p>Providers: <span className="font-medium text-foreground">{row.providers.length > 0 ? row.providers.join(", ") : "unknown"}</span></p>
                 </div>
