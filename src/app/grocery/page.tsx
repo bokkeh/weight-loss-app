@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { shareOrCopy } from "@/lib/shareUtils";
-import { Check, CheckCircle2, Circle, ListChecks, Share2, Sparkles, Trash2 } from "lucide-react";
+import { Check, CheckCircle2, Circle, ListChecks, Pencil, Share2, Sparkles, Trash2, X } from "lucide-react";
 
 interface GroceryItem {
   id: number;
@@ -86,6 +86,9 @@ export default function GroceryPage() {
   const [manualQty, setManualQty] = useState("");
   const [aiPrompt, setAiPrompt] = useState("");
   const [shareDone, setShareDone] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [quantityDraft, setQuantityDraft] = useState("");
+  const [quantitySavingId, setQuantitySavingId] = useState<number | null>(null);
 
   async function fetchItems() {
     setLoading(true);
@@ -167,6 +170,34 @@ export default function GroceryPage() {
   async function deleteItem(id: number) {
     await fetch(`/api/grocery/${id}`, { method: "DELETE" });
     setItems((prev) => prev.filter((it) => it.id !== id));
+  }
+
+  function startEditQuantity(item: GroceryItem) {
+    setEditingId(item.id);
+    setQuantityDraft(item.quantity ?? "");
+  }
+
+  function cancelEditQuantity() {
+    setEditingId(null);
+    setQuantityDraft("");
+  }
+
+  async function saveQuantity(item: GroceryItem) {
+    setQuantitySavingId(item.id);
+    try {
+      const res = await fetch(`/api/grocery/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity: quantityDraft.trim() }),
+      });
+      const updated = await readJsonSafe<GroceryItem>(res);
+      if (res.ok && updated) {
+        setItems((prev) => prev.map((it) => (it.id === updated.id ? updated : it)));
+        cancelEditQuantity();
+      }
+    } finally {
+      setQuantitySavingId(null);
+    }
   }
 
   async function shareList() {
@@ -263,9 +294,49 @@ export default function GroceryPage() {
                     <p className={`font-medium ${item.checked ? "line-through text-muted-foreground" : ""}`}>
                       {item.name}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.quantity || "No quantity"} | {item.source}
-                    </p>
+                    {editingId === item.id ? (
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <Input
+                          value={quantityDraft}
+                          onChange={(e) => setQuantityDraft(e.target.value)}
+                          placeholder="Quantity"
+                          className="h-8 text-xs max-w-[180px]"
+                        />
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => saveQuantity(item)}
+                          disabled={quantitySavingId === item.id}
+                          aria-label="Save quantity"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={cancelEditQuantity}
+                          aria-label="Cancel editing quantity"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <span>{item.quantity || "No quantity"} | {item.source}</span>
+                        <button
+                          type="button"
+                          onClick={() => startEditQuantity(item)}
+                          className="inline-flex items-center text-muted-foreground hover:text-foreground"
+                          aria-label="Edit quantity"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      </p>
+                    )}
                   </div>
                   <button type="button" onClick={() => deleteItem(item.id)} className="text-muted-foreground hover:text-red-600">
                     <Trash2 className="h-4 w-4" />
