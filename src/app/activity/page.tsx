@@ -379,7 +379,7 @@ export default function ActivityPage() {
           <div className="grid gap-3">
             {generatedWorkout ? (
               <Card className="overflow-hidden !py-0 gap-0 border-violet-200">
-                <CardHeader className="pb-3 bg-gradient-to-r from-violet-50 to-fuchsia-50">
+                <CardHeader className="pt-5 pb-3 bg-gradient-to-r from-violet-50 to-fuchsia-50">
                   <div className="flex items-start justify-between gap-3">
                     <CardTitle className="text-lg flex items-center gap-2">
                       <Sparkles className="h-4 w-4 text-violet-600" />
