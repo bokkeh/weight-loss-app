@@ -121,12 +121,14 @@ async function ensureMultiUserSchemaInternal() {
       user_id     INTEGER NOT NULL,
       name        TEXT NOT NULL,
       quantity    TEXT,
+      liked       BOOLEAN NOT NULL DEFAULT FALSE,
       checked     BOOLEAN NOT NULL DEFAULT FALSE,
       source      TEXT NOT NULL DEFAULT 'manual',
       recipe_id   INTEGER,
       created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS liked BOOLEAN NOT NULL DEFAULT FALSE`;
 
 
   await sql`

@@ -6,16 +6,39 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { shareOrCopy } from "@/lib/shareUtils";
-import { Check, CheckCircle2, Circle, ListChecks, Pencil, Share2, Sparkles, Trash2, X } from "lucide-react";
+import { Check, CheckCircle2, Circle, ListChecks, Pencil, Share2, Sparkles, Star, Trash2, X } from "lucide-react";
 
 interface GroceryItem {
   id: number;
   name: string;
   quantity: string | null;
+  liked: boolean;
   checked: boolean;
   source: string;
   recipe_id?: number | null;
   created_at: string;
+}
+
+type GroceryGroupKey = "liked" | "fruits" | "veggies" | "breads" | "meats" | "dairy" | "misc";
+
+const GROUP_LABELS: Record<GroceryGroupKey, string> = {
+  liked: "Liked Items",
+  fruits: "Fruits",
+  veggies: "Veggies",
+  breads: "Breads",
+  meats: "Meats",
+  dairy: "Dairy",
+  misc: "Miscellaneous",
+};
+
+function inferGroup(name: string): GroceryGroupKey {
+  const value = name.toLowerCase();
+  if (/\b(apple|banana|berry|berries|orange|grape|melon|pear|peach|plum|pineapple|mango|avocado|fruit)\b/.test(value)) return "fruits";
+  if (/\b(spinach|lettuce|kale|broccoli|carrot|pepper|onion|tomato|cucumber|zucchini|cauliflower|celery|vegetable|veggie)\b/.test(value)) return "veggies";
+  if (/\b(bread|bagel|bun|roll|tortilla|pita|sourdough|baguette|toast)\b/.test(value)) return "breads";
+  if (/\b(chicken|turkey|beef|steak|pork|ham|sausage|bacon|salmon|tuna|fish|shrimp|meat)\b/.test(value)) return "meats";
+  if (/\b(milk|cheese|yogurt|butter|cream|cottage|egg|eggs|dairy)\b/.test(value)) return "dairy";
+  return "misc";
 }
 
 async function readJsonSafe<T>(res: Response): Promise<T | null> {
@@ -167,6 +190,18 @@ export default function GroceryPage() {
     }
   }
 
+  async function toggleLiked(item: GroceryItem) {
+    const res = await fetch(`/api/grocery/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ liked: !item.liked }),
+    });
+    const updated = await readJsonSafe<GroceryItem>(res);
+    if (res.ok && updated) {
+      setItems((prev) => prev.map((it) => (it.id === updated.id ? updated : it)));
+    }
+  }
+
   async function deleteItem(id: number) {
     await fetch(`/api/grocery/${id}`, { method: "DELETE" });
     setItems((prev) => prev.filter((it) => it.id !== id));
@@ -219,6 +254,26 @@ export default function GroceryPage() {
   }
 
   const remaining = useMemo(() => items.filter((i) => !i.checked).length, [items]);
+  const groupedItems = useMemo(() => {
+    const groups: Record<GroceryGroupKey, GroceryItem[]> = {
+      liked: [],
+      fruits: [],
+      veggies: [],
+      breads: [],
+      meats: [],
+      dairy: [],
+      misc: [],
+    };
+    const sorted = [...items].sort((a, b) => Number(a.checked) - Number(b.checked));
+    for (const item of sorted) {
+      if (item.liked) {
+        groups.liked.push(item);
+      } else {
+        groups[inferGroup(item.name)].push(item);
+      }
+    }
+    return groups;
+  }, [items]);
 
   return (
     <div className="space-y-5">
@@ -275,74 +330,96 @@ export default function GroceryPage() {
               Add your first grocery item or use AI Quick Add.
             </div>
           ) : (
-            <div className="space-y-2">
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className={`rounded-xl border p-3 flex items-center gap-3 ${
-                    item.checked ? "bg-green-50/50 border-green-200" : "bg-white"
-                  }`}
-                >
-                  <button type="button" onClick={() => toggleItem(item)} className="shrink-0">
-                    {item.checked ? (
-                      <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    ) : (
-                      <Circle className="h-5 w-5 text-slate-500" />
-                    )}
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <p className={`font-medium ${item.checked ? "line-through text-muted-foreground" : ""}`}>
-                      {item.name}
-                    </p>
-                    {editingId === item.id ? (
-                      <div className="mt-1 flex items-center gap-1.5">
-                        <Input
-                          value={quantityDraft}
-                          onChange={(e) => setQuantityDraft(e.target.value)}
-                          placeholder="Quantity"
-                          className="h-8 text-xs max-w-[180px]"
-                        />
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          onClick={() => saveQuantity(item)}
-                          disabled={quantitySavingId === item.id}
-                          aria-label="Save quantity"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          onClick={cancelEditQuantity}
-                          aria-label="Cancel editing quantity"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                        <span>{item.quantity || "No quantity"} | {item.source}</span>
+            <div className="space-y-4">
+              {(Object.keys(GROUP_LABELS) as GroceryGroupKey[]).map((groupKey) => {
+                const group = groupedItems[groupKey];
+                if (group.length === 0) return null;
+                return (
+                  <div key={groupKey} className="space-y-2">
+                    <div className="px-1">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        {GROUP_LABELS[groupKey]} ({group.length})
+                      </p>
+                    </div>
+                    {group.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`rounded-xl border p-3 flex items-center gap-3 ${
+                          item.checked ? "bg-green-50/50 border-green-200" : "bg-white"
+                        }`}
+                      >
+                        <button type="button" onClick={() => toggleItem(item)} className="shrink-0">
+                          {item.checked ? (
+                            <CheckCircle2 className="h-5 w-5 text-green-600" />
+                          ) : (
+                            <Circle className="h-5 w-5 text-slate-500" />
+                          )}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-medium ${item.checked ? "line-through text-muted-foreground" : ""}`}>
+                            {item.name}
+                          </p>
+                          {editingId === item.id ? (
+                            <div className="mt-1 flex items-center gap-1.5">
+                              <Input
+                                value={quantityDraft}
+                                onChange={(e) => setQuantityDraft(e.target.value)}
+                                placeholder="Quantity"
+                                className="h-8 text-xs max-w-[180px]"
+                              />
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                onClick={() => saveQuantity(item)}
+                                disabled={quantitySavingId === item.id}
+                                aria-label="Save quantity"
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                onClick={cancelEditQuantity}
+                                aria-label="Cancel editing quantity"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                              <span>{item.quantity || "No quantity"} | {item.source}</span>
+                              <button
+                                type="button"
+                                onClick={() => startEditQuantity(item)}
+                                className="inline-flex items-center text-muted-foreground hover:text-foreground"
+                                aria-label="Edit quantity"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                            </p>
+                          )}
+                        </div>
                         <button
                           type="button"
-                          onClick={() => startEditQuantity(item)}
-                          className="inline-flex items-center text-muted-foreground hover:text-foreground"
-                          aria-label="Edit quantity"
+                          onClick={() => toggleLiked(item)}
+                          className={`${item.liked ? "text-amber-500" : "text-muted-foreground"} hover:text-amber-500`}
+                          aria-label={item.liked ? "Unlike item" : "Like item"}
+                          title={item.liked ? "Unlike item" : "Like item"}
                         >
-                          <Pencil className="h-3.5 w-3.5" />
+                          <Star className={`h-4 w-4 ${item.liked ? "fill-current" : ""}`} />
                         </button>
-                      </p>
-                    )}
+                        <button type="button" onClick={() => deleteItem(item.id)} className="text-muted-foreground hover:text-red-600">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                  <button type="button" onClick={() => deleteItem(item.id)} className="text-muted-foreground hover:text-red-600">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
