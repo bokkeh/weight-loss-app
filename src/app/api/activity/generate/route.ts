@@ -22,6 +22,7 @@ export async function POST(req: Request) {
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
     const windowHours = Number(body.window_hours ?? 72);
     const intensity = String(body.intensity ?? "moderate");
+    const targetMinutes = Math.max(10, Math.min(120, Number(body.target_minutes ?? 45)));
     const insights = Array.isArray(body.insights) ? body.insights.map((v) => String(v)).slice(0, 5) : [];
     const topFoods = Array.isArray(body.top_foods)
       ? body.top_foods
@@ -40,13 +41,14 @@ export async function POST(req: Request) {
         {
           role: "system",
           content:
-            "You are an expert trainer for fat-loss and general health. Return only valid JSON matching: {\"title\":\"string\",\"duration_min\":number,\"equipment\":\"bodyweight|dumbbells|mixed\",\"focus\":\"string\",\"checklist\":[\"string\"],\"notes\":\"string\"}. Keep checklist 5-8 concise actions. Prefer bodyweight and dumbbells.",
+            "You are an expert trainer for fat-loss and general health. Return only valid JSON matching: {\"title\":\"string\",\"duration_min\":number,\"equipment\":\"bodyweight|dumbbells|mixed\",\"focus\":\"string\",\"checklist\":[\"string\"],\"notes\":\"string\"}. Keep checklist 5-8 concise actions. Prefer bodyweight and dumbbells. Match duration to requested minutes as closely as possible.",
         },
         {
           role: "user",
           content: `Build one workout for this user context:
 - Window: last ${windowHours} hours
 - Readiness intensity: ${intensity}
+- Available workout time: ${targetMinutes} minutes
 - Recent insights: ${insights.join(" | ") || "none"}
 - Recent foods: ${topFoods.join(", ") || "none"}
 
@@ -80,7 +82,10 @@ Output JSON only.`,
 
     return NextResponse.json({
       title: String(parsed.title),
-      duration_min: Number(parsed.duration_min) > 0 ? Math.round(Number(parsed.duration_min)) : 30,
+      duration_min:
+        Number(parsed.duration_min) > 0
+          ? Math.max(targetMinutes - 10, Math.min(targetMinutes + 10, Math.round(Number(parsed.duration_min))))
+          : targetMinutes,
       equipment: ["bodyweight", "dumbbells", "mixed"].includes(String(parsed.equipment))
         ? parsed.equipment
         : "mixed",
@@ -92,4 +97,3 @@ Output JSON only.`,
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }
-

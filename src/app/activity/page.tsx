@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Beef, CheckSquare, Dumbbell, Droplets, Footprints, Flame, Loader2, Scale, Sparkles, Square, TrendingDown } from "lucide-react";
 
 type Intensity = "low" | "moderate" | "high";
@@ -60,6 +61,7 @@ export default function ActivityPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [windowHours, setWindowHours] = useState<24 | 72>(72);
+  const [workoutMinutes, setWorkoutMinutes] = useState(45);
   const [genLoading, setGenLoading] = useState(false);
   const [generatedWorkout, setGeneratedWorkout] = useState<GeneratedWorkout | null>(null);
   const [checkedItems, setCheckedItems] = useState<Record<number, boolean>>({});
@@ -181,6 +183,7 @@ export default function ActivityPage() {
           intensity: data.intensity,
           insights: data.insights,
           top_foods: data.top_foods,
+          target_minutes: Math.max(10, Math.min(120, Number(workoutMinutes) || 45)),
         }),
       });
       const raw = await res.text().catch(() => "");
@@ -247,7 +250,22 @@ export default function ActivityPage() {
                 <Badge variant="secondary" className="capitalize">
                   {data.intensity} intensity
                 </Badge>
-                <Button size="sm" className="h-7 px-3 text-xs ml-auto" onClick={generateWorkout} disabled={genLoading}>
+                <div className="ml-auto flex items-center gap-2">
+                  <div className="w-24">
+                    <Input
+                      type="number"
+                      min={10}
+                      max={120}
+                      step={5}
+                      value={workoutMinutes}
+                      onChange={(e) => setWorkoutMinutes(Math.max(10, Math.min(120, Number(e.target.value) || 45)))}
+                      className="h-7 text-xs"
+                      aria-label="Workout minutes"
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground">min</span>
+                </div>
+                <Button size="sm" className="h-7 px-3 text-xs" onClick={generateWorkout} disabled={genLoading}>
                   {genLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}
                   Generate Workout
                 </Button>
@@ -359,7 +377,7 @@ export default function ActivityPage() {
           </Card>
 
           <div className="grid gap-3">
-            {generatedWorkout && (
+            {generatedWorkout ? (
               <Card className="overflow-hidden !py-0 gap-0 border-violet-200">
                 <CardHeader className="pb-3 bg-gradient-to-r from-violet-50 to-fuchsia-50">
                   <div className="flex items-start justify-between gap-3">
@@ -376,7 +394,7 @@ export default function ActivityPage() {
                     <Badge variant="secondary">{generatedWorkout.focus}</Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-4 space-y-3">
+                <CardContent className="pt-4 pb-5 space-y-3">
                   <p className="text-sm text-muted-foreground">
                     Check off each line as you complete it.
                   </p>
@@ -405,40 +423,13 @@ export default function ActivityPage() {
                   ) : null}
                 </CardContent>
               </Card>
-            )}
-            {data.recommendations.map((plan, idx) => (
-              <Card key={`${plan.title}-${idx}`} className="overflow-hidden !py-0 gap-0 border-slate-200">
-                <CardHeader
-                  className={`pb-3 ${
-                    plan.equipment === "dumbbells"
-                      ? "bg-gradient-to-r from-blue-50 to-indigo-50"
-                      : "bg-gradient-to-r from-emerald-50 to-teal-50"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <CardTitle className="text-lg">{plan.title}</CardTitle>
-                    <Badge variant="outline" className="capitalize bg-white/70 border-white">
-                      {plan.equipment}
-                    </Badge>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs pt-1">
-                    <Badge variant="secondary">{plan.duration_min} min</Badge>
-                    <Badge variant="secondary" className="capitalize">{plan.level}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-4 space-y-3">
-                  <p className="text-sm text-muted-foreground">{plan.reason}</p>
-                  <div className="space-y-2">
-                    {plan.moves.map((move, moveIdx) => (
-                      <div key={moveIdx} className="rounded-md border bg-muted/25 px-3 py-2 text-sm">
-                        <span className="text-muted-foreground mr-2 font-medium">{moveIdx + 1}.</span>
-                        {move}
-                      </div>
-                    ))}
-                  </div>
+            ) : (
+              <Card>
+                <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                  Enter minutes and tap <span className="font-medium">Generate Workout</span> to create your checklist plan.
                 </CardContent>
               </Card>
-            ))}
+            )}
           </div>
         </>
       ) : null}
