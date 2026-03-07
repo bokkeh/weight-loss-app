@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { shareOrCopy } from "@/lib/shareUtils";
-import { Check, CheckCircle2, Circle, ListChecks, Pencil, Share2, Sparkles, Star, Trash2, X } from "lucide-react";
+import { Check, CheckCircle2, Circle, GripVertical, ListChecks, Pencil, Share2, Sparkles, Star, Trash2, X } from "lucide-react";
 
 interface GroceryItem {
   id: number;
@@ -14,6 +15,7 @@ interface GroceryItem {
   quantity: string | null;
   liked: boolean;
   category?: GroceryGroupKey | null;
+  sort_order?: number;
   checked: boolean;
   source: string;
   recipe_id?: number | null;
@@ -32,6 +34,16 @@ const GROUP_LABELS: Record<GroceryGroupKey, string> = {
   spices_sauces: "Spices/Sauces",
   misc: "Miscellaneous",
 };
+
+const EDITABLE_CATEGORY_KEYS: GroceryGroupKey[] = [
+  "fruits",
+  "veggies",
+  "breads",
+  "meats",
+  "dairy",
+  "spices_sauces",
+  "misc",
+];
 
 function inferGroup(name: string): GroceryGroupKey {
   const value = name.toLowerCase();
@@ -114,6 +126,7 @@ export default function GroceryPage() {
   const [shareDone, setShareDone] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [quantityDraft, setQuantityDraft] = useState("");
+  const [categoryDraft, setCategoryDraft] = useState<GroceryGroupKey>("misc");
   const [quantitySavingId, setQuantitySavingId] = useState<number | null>(null);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dragOverGroup, setDragOverGroup] = useState<GroceryGroupKey | null>(null);
@@ -231,6 +244,8 @@ export default function GroceryPage() {
   function startEditQuantity(item: GroceryItem) {
     setEditingId(item.id);
     setQuantityDraft(item.quantity ?? "");
+    const currentCategory = item.liked ? "misc" : item.category ?? inferGroup(item.name);
+    setCategoryDraft(currentCategory);
   }
 
   function cancelEditQuantity() {
@@ -244,7 +259,11 @@ export default function GroceryPage() {
       const res = await fetch(`/api/grocery/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quantity: quantityDraft.trim() }),
+        body: JSON.stringify({
+          quantity: quantityDraft.trim(),
+          category: categoryDraft,
+          liked: item.liked && categoryDraft === "misc",
+        }),
       });
       const updated = await readJsonSafe<GroceryItem>(res);
       if (res.ok && updated) {
@@ -256,8 +275,46 @@ export default function GroceryPage() {
     }
   }
 
+  async function swapItemOrder(source: GroceryItem, target: GroceryItem) {
+    const sourceOrder = Number.isFinite(source.sort_order) ? Number(source.sort_order) : source.id;
+    const targetOrder = Number.isFinite(target.sort_order) ? Number(target.sort_order) : target.id;
+    if (sourceOrder === targetOrder) return;
+
+    const [aRes, bRes] = await Promise.all([
+      fetch(`/api/grocery/${source.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sort_order: targetOrder }),
+      }),
+      fetch(`/api/grocery/${target.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sort_order: sourceOrder }),
+      }),
+    ]);
+    const [aUpdated, bUpdated] = await Promise.all([
+      readJsonSafe<GroceryItem>(aRes),
+      readJsonSafe<GroceryItem>(bRes),
+    ]);
+    if (aRes.ok && bRes.ok && aUpdated && bUpdated) {
+      setItems((prev) =>
+        prev.map((it) => {
+          if (it.id === aUpdated.id) return aUpdated;
+          if (it.id === bUpdated.id) return bUpdated;
+          return it;
+        })
+      );
+    }
+  }
+
   async function shareList() {
-    const sorted = [...items].sort((a, b) => Number(a.checked) - Number(b.checked));
+    const sorted = [...items].sort((a, b) => {
+      if (Number(a.checked) !== Number(b.checked)) return Number(a.checked) - Number(b.checked);
+      const aOrder = Number.isFinite(a.sort_order) ? Number(a.sort_order) : Number.MAX_SAFE_INTEGER;
+      const bOrder = Number.isFinite(b.sort_order) ? Number(b.sort_order) : Number.MAX_SAFE_INTEGER;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
     const file = await buildChecklistImage(sorted);
     const nav = navigator as Navigator & { canShare?: (data: { files?: File[] }) => boolean };
 
@@ -354,6 +411,42 @@ export default function GroceryPage() {
             </div>
           ) : (
             <div className="space-y-4">
+              {groupedItems.liked.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Favorites</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {groupedItems.liked.map((fav) => (
+                        <div key={`fav-${fav.id}`} className="shrink-0 rounded-lg border px-3 py-2 min-w-56 bg-background">
+                          <p className="text-sm font-medium truncate">{fav.name}</p>
+                          <p className="text-xs text-muted-foreground">{fav.quantity || "No quantity"}</p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-2 h-7 text-xs"
+                            onClick={async () => {
+                              const res = await fetch("/api/grocery", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ name: fav.name, quantity: fav.quantity }),
+                              });
+                              const created = await readJsonSafe<GroceryItem>(res);
+                              if (res.ok && created) {
+                                setItems((prev) => [created, ...prev]);
+                              }
+                            }}
+                          >
+                            Add Again
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {(Object.keys(GROUP_LABELS) as GroceryGroupKey[]).map((groupKey) => {
                 const group = groupedItems[groupKey];
                 if (group.length === 0) return null;
@@ -394,6 +487,21 @@ export default function GroceryPage() {
                           setDraggingId(item.id);
                           e.dataTransfer.setData("text/plain", String(item.id));
                         }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const sourceId = Number(e.dataTransfer.getData("text/plain") || draggingId);
+                          const source = items.find((it) => it.id === sourceId);
+                          if (!source || source.id === item.id) return;
+                          const sourceGroup = source.liked ? "liked" : source.category ?? inferGroup(source.name);
+                          if (sourceGroup === groupKey) {
+                            swapItemOrder(source, item).catch(() => undefined);
+                          } else {
+                            moveItemToGroup(source, groupKey).catch(() => undefined);
+                          }
+                          setDragOverGroup(null);
+                          setDraggingId(null);
+                        }}
                         onDragEnd={() => {
                           setDraggingId(null);
                           setDragOverGroup(null);
@@ -402,6 +510,9 @@ export default function GroceryPage() {
                           item.checked ? "bg-green-50/50 border-green-200" : "bg-white"
                         } ${draggingId === item.id ? "opacity-60" : ""}`}
                       >
+                        <div className="text-muted-foreground/70 shrink-0" title="Drag to reorder or move">
+                          <GripVertical className="h-4 w-4" />
+                        </div>
                         <button type="button" onClick={() => toggleItem(item)} className="shrink-0">
                           {item.checked ? (
                             <CheckCircle2 className="h-5 w-5 text-green-600" />
@@ -414,13 +525,25 @@ export default function GroceryPage() {
                             {item.name}
                           </p>
                           {editingId === item.id ? (
-                            <div className="mt-1 flex items-center gap-1.5">
+                            <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                               <Input
                                 value={quantityDraft}
                                 onChange={(e) => setQuantityDraft(e.target.value)}
                                 placeholder="Quantity"
                                 className="h-8 text-xs max-w-[180px]"
                               />
+                              <Select value={categoryDraft} onValueChange={(v) => setCategoryDraft(v as GroceryGroupKey)}>
+                                <SelectTrigger className="h-8 w-[170px] text-xs">
+                                  <SelectValue placeholder="Category" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {EDITABLE_CATEGORY_KEYS.map((key) => (
+                                    <SelectItem key={key} value={key}>
+                                      {GROUP_LABELS[key]}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                               <Button
                                 type="button"
                                 size="icon"

@@ -25,6 +25,8 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
         : body.category === null
           ? null
           : undefined;
+    const sortOrder = Number(body.sort_order);
+    const normalizedSortOrder = Number.isFinite(sortOrder) ? Math.max(0, Math.floor(sortOrder)) : null;
     const name = typeof body.name === "string" ? body.name.trim() : null;
     const quantity = typeof body.quantity === "string" ? body.quantity.trim() : null;
 
@@ -37,10 +39,11 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
           WHEN ${categoryProvided} THEN ${category ?? null}
           ELSE category
         END,
+        sort_order = COALESCE(${normalizedSortOrder}, sort_order),
         name = COALESCE(${name || null}, name),
         quantity = COALESCE(${quantity || null}, quantity)
       WHERE id = ${itemId} AND user_id = ${userId}
-      RETURNING id, user_id, name, quantity, liked, category, checked, source, recipe_id, created_at::text
+      RETURNING id, user_id, name, quantity, liked, category, sort_order, checked, source, recipe_id, created_at::text
     `;
 
     if (!updated) {
