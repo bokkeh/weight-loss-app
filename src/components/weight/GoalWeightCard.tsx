@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,13 @@ interface Props {
 export function GoalWeightCard({ startWeight, currentWeight, goalWeight, onGoalSet }: Props) {
   const [editing, setEditing] = useState(!goalWeight);
   const [input, setInput] = useState(goalWeight ? String(goalWeight) : "");
+
+  useEffect(() => {
+    if (goalWeight != null && Number.isFinite(Number(goalWeight))) {
+      setInput(String(goalWeight));
+      setEditing(false);
+    }
+  }, [goalWeight]);
 
   function handleSave() {
     const val = parseFloat(input);

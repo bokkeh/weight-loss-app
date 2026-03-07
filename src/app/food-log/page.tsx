@@ -17,7 +17,6 @@ import { MacroProgressBars } from "@/components/food-log/MacroProgressBars";
 import { QuickLogBar } from "@/components/food-log/QuickLogBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FoodLogEntry, DailyMacroTotals } from "@/types";
-import { shareOrCopy } from "@/lib/shareUtils";
 import { localDateStr } from "@/lib/utils";
 import { DEFAULT_MACRO_GOALS, goalsFromProfile, type MacroGoals } from "@/lib/goals";
 import Link from "next/link";
@@ -83,6 +82,88 @@ function buildShareText(entries: FoodLogEntry[], date: Date, goals: MacroGoals):
   lines.push(`Calories: ${totals.calories.toFixed(0)} / ${goals.calories} | Protein: ${totals.protein_g.toFixed(1)}g / ${goals.protein_g}g | Carbs: ${totals.carbs_g.toFixed(1)}g / ${goals.carbs_g}g | Fat: ${totals.fat_g.toFixed(1)}g / ${goals.fat_g}g | Fiber: ${totals.fiber_g.toFixed(1)}g / ${goals.fiber_g}g | Sodium: ${totals.sodium_mg.toFixed(0)}mg / ${goals.sodium_mg}mg`);
 
   return lines.join("\n");
+}
+
+async function buildFoodLogSnapshotImage(entries: FoodLogEntry[], date: Date, goals: MacroGoals): Promise<File> {
+  const totals = sumMacros(entries);
+  const grouped = [
+    { meal: "Breakfast", items: entries.filter((e) => e.meal_type === "breakfast") },
+    { meal: "Lunch", items: entries.filter((e) => e.meal_type === "lunch") },
+    { meal: "Dinner", items: entries.filter((e) => e.meal_type === "dinner") },
+    { meal: "Snack", items: entries.filter((e) => e.meal_type === "snack") },
+  ].filter((g) => g.items.length > 0);
+
+  const rows = Math.max(8, grouped.reduce((sum, g) => sum + g.items.length + 1, 0));
+  const width = 1180;
+  const height = 340 + rows * 56 + 230;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not create day snapshot image.");
+
+  ctx.fillStyle = "#f8fafc";
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "700 54px Arial";
+  ctx.fillText("Meals for the Day", 70, 100);
+
+  ctx.fillStyle = "#64748b";
+  ctx.font = "400 28px Arial";
+  ctx.fillText(
+    date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }),
+    70,
+    145
+  );
+
+  let y = 210;
+  for (const group of grouped) {
+    ctx.fillStyle = "#111827";
+    ctx.font = "700 30px Arial";
+    ctx.fillText(group.meal, 70, y);
+    y += 42;
+
+    for (const item of group.items) {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(60, y - 30, width - 120, 40);
+      ctx.strokeStyle = "#e2e8f0";
+      ctx.strokeRect(60, y - 30, width - 120, 40);
+
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "500 24px Arial";
+      const left = `${item.food_name}${item.serving_size ? ` (${item.serving_size})` : ""}`;
+      ctx.fillText(left, 80, y - 3);
+
+      const macro = `${Number(item.calories).toFixed(0)} cal  |  P ${Number(item.protein_g).toFixed(0)}g  C ${Number(item.carbs_g).toFixed(0)}g  F ${Number(item.fat_g).toFixed(0)}g`;
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#475569";
+      ctx.fillText(macro, width - 80, y - 3);
+      ctx.textAlign = "left";
+
+      y += 52;
+    }
+  }
+
+  const totalsTop = height - 200;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(60, totalsTop, width - 120, 150);
+  ctx.strokeStyle = "#cbd5e1";
+  ctx.strokeRect(60, totalsTop, width - 120, 150);
+
+  ctx.fillStyle = "#111827";
+  ctx.font = "700 30px Arial";
+  ctx.fillText("Daily Totals", 80, totalsTop + 44);
+
+  ctx.fillStyle = "#334155";
+  ctx.font = "500 24px Arial";
+  ctx.fillText(`Calories ${totals.calories.toFixed(0)} / ${goals.calories.toFixed(0)} kcal`, 80, totalsTop + 82);
+  ctx.fillText(`Protein ${totals.protein_g.toFixed(0)}g | Carbs ${totals.carbs_g.toFixed(0)}g | Fat ${totals.fat_g.toFixed(0)}g`, 80, totalsTop + 114);
+  ctx.fillText(`Fiber ${totals.fiber_g.toFixed(0)}g | Sodium ${totals.sodium_mg.toFixed(0)}mg`, 80, totalsTop + 144);
+
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("Failed to build day snapshot.");
+  return new File([blob], `food-log-${localDateStr(date)}.png`, { type: "image/png" });
 }
 
 function targetMealForHour(hour: number): "breakfast" | "lunch" | "dinner" | "snack" {
@@ -411,9 +492,29 @@ export default function FoodLogPage() {
     setRecentEntries((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
   }
 
+  function handleReordered(nextEntries: FoodLogEntry[]) {
+    setEntries(nextEntries);
+    const byId = new Map(nextEntries.map((entry) => [entry.id, entry]));
+    setRecentEntries((prev) => prev.map((entry) => byId.get(entry.id) ?? entry));
+  }
+
   async function handleShare() {
-    const text = buildShareText(entries, selectedDate, goals);
-    await shareOrCopy(text, "Food Log");
+    const file = await buildFoodLogSnapshotImage(entries, selectedDate, goals);
+    const nav = navigator as Navigator & { canShare?: (data: { files?: File[] }) => boolean };
+    if (nav.share && nav.canShare?.({ files: [file] })) {
+      await nav.share({
+        title: "Food Log",
+        text: "Today's meals snapshot",
+        files: [file],
+      });
+    } else {
+      const url = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = file.name;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
     setShareLabel("done");
     setTimeout(() => setShareLabel("share"), 2000);
   }
@@ -708,6 +809,7 @@ export default function FoodLogPage() {
                   entries={entries}
                   onDelete={handleDelete}
                   onUpdated={handleUpdated}
+                  onReordered={handleReordered}
                 />
               )}
             </CardContent>

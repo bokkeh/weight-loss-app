@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Trash2, Bot, ChefHat, X, Check } from "lucide-react";
+import { Trash2, Bot, ChefHat, X, Check, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,6 +17,7 @@ interface Props {
   entries: FoodLogEntry[];
   onDelete: (id: number) => void;
   onUpdated: (entry: FoodLogEntry) => void;
+  onReordered?: (nextEntries: FoodLogEntry[]) => void;
 }
 
 const MEAL_ORDER = ["breakfast", "lunch", "dinner", "snack"] as const;
@@ -201,8 +202,24 @@ function InlineEditForm({
   );
 }
 
-export function FoodLogTable({ entries, onDelete, onUpdated }: Props) {
+function normalizeMealType(meal: string): FoodLogEntry["meal_type"] {
+  if (meal === "other") return null;
+  return MEAL_ORDER.includes(meal as (typeof MEAL_ORDER)[number])
+    ? (meal as FoodLogEntry["meal_type"])
+    : "snack";
+}
+
+function byOrder(a: FoodLogEntry, b: FoodLogEntry) {
+  const ao = Number.isFinite(Number(a.display_order)) ? Number(a.display_order) : Number.MAX_SAFE_INTEGER;
+  const bo = Number.isFinite(Number(b.display_order)) ? Number(b.display_order) : Number.MAX_SAFE_INTEGER;
+  if (ao !== bo) return ao - bo;
+  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+}
+
+export function FoodLogTable({ entries, onDelete, onUpdated, onReordered }: Props) {
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [savingReorder, setSavingReorder] = useState(false);
 
   if (entries.length === 0) {
     return (
@@ -216,17 +233,82 @@ export function FoodLogTable({ entries, onDelete, onUpdated }: Props) {
 
   const grouped = MEAL_ORDER.map((meal) => ({
     meal,
-    items: entries.filter((e) => e.meal_type === meal),
+    items: entries.filter((e) => e.meal_type === meal).sort(byOrder),
   })).filter((g) => g.items.length > 0);
 
   const ungrouped = entries.filter(
     (e) => !MEAL_ORDER.includes(e.meal_type as "breakfast" | "lunch" | "dinner" | "snack")
-  );
+  ).sort(byOrder);
 
   const allGroups = [
     ...grouped,
     ...(ungrouped.length > 0 ? [{ meal: "other" as const, items: ungrouped }] : []),
   ];
+
+  async function persistReorder(
+    draggedId: number,
+    targetMeal: string,
+    targetIndex: number | null
+  ) {
+    const dragged = entries.find((e) => e.id === draggedId);
+    if (!dragged || savingReorder) return;
+
+    const sourceMeal = dragged.meal_type ?? "other";
+    const normalizedMeal = normalizeMealType(targetMeal);
+    const sourceList = entries
+      .filter((e) => (e.meal_type ?? "other") === sourceMeal && e.id !== draggedId)
+      .sort(byOrder);
+    const targetListBase = entries
+      .filter((e) => (e.meal_type ?? "other") === targetMeal && e.id !== draggedId)
+      .sort(byOrder);
+
+    const insertAt = targetIndex == null ? targetListBase.length : Math.max(0, Math.min(targetIndex, targetListBase.length));
+    const targetList = [...targetListBase];
+    targetList.splice(insertAt, 0, { ...dragged, meal_type: normalizedMeal });
+
+    const changed = new Map<number, FoodLogEntry>();
+    const nextEntries = entries.map((entry) => ({ ...entry }));
+
+    const applyOrder = (list: FoodLogEntry[], meal: FoodLogEntry["meal_type"]) => {
+      list.forEach((entry, idx) => {
+        const next = nextEntries.find((e) => e.id === entry.id);
+        if (!next) return;
+        const nextOrder = (idx + 1) * 10;
+        const nextMeal = meal;
+        if (next.display_order !== nextOrder || next.meal_type !== nextMeal) {
+          next.display_order = nextOrder;
+          next.meal_type = nextMeal;
+          changed.set(next.id, { ...next });
+        }
+      });
+    };
+
+    applyOrder(targetList, normalizedMeal);
+    if (sourceMeal !== targetMeal) {
+      applyOrder(sourceList, normalizeMealType(sourceMeal));
+    }
+
+    if (changed.size === 0) return;
+    onReordered?.(nextEntries);
+    setSavingReorder(true);
+    try {
+      for (const entry of changed.values()) {
+        const res = await fetch(`/api/food-log/${entry.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            meal_type: entry.meal_type,
+            display_order: entry.display_order ?? null,
+          }),
+        });
+        if (!res.ok) continue;
+        const updated = (await res.json()) as FoodLogEntry;
+        onUpdated(updated);
+      }
+    } finally {
+      setSavingReorder(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -241,12 +323,41 @@ export function FoodLogTable({ entries, onDelete, onUpdated }: Props) {
             </span>
           </div>
 
-          <div className="rounded-md border divide-y">
+          <div
+            className="rounded-md border divide-y"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const fromId = Number(e.dataTransfer.getData("text/plain") || draggingId);
+              if (!fromId) return;
+              persistReorder(fromId, meal, null).catch(() => undefined);
+              setDraggingId(null);
+            }}
+          >
             {items.map((entry) => (
-              <div key={entry.id} className="px-3 py-2">
+              <div
+                key={entry.id}
+                className={`px-3 py-2 ${draggingId === entry.id ? "opacity-60" : ""}`}
+                draggable={!savingReorder}
+                onDragStart={(e) => {
+                  setDraggingId(entry.id);
+                  e.dataTransfer.setData("text/plain", String(entry.id));
+                }}
+                onDragEnd={() => setDraggingId(null)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const fromId = Number(e.dataTransfer.getData("text/plain") || draggingId);
+                  if (!fromId || fromId === entry.id) return;
+                  const idx = items.findIndex((it) => it.id === entry.id);
+                  persistReorder(fromId, meal, idx).catch(() => undefined);
+                  setDraggingId(null);
+                }}
+              >
                 {/* Main row */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-start gap-1.5 min-w-0">
+                    <GripVertical className="h-4 w-4 text-muted-foreground/60 shrink-0 mt-0.5 cursor-grab" />
                     {entry.source === "ai_chat" && (
                       <Bot className="h-3.5 w-3.5 text-violet-500 shrink-0 mt-0.5" />
                     )}

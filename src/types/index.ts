@@ -11,6 +11,7 @@ export interface FoodLogEntry {
   id: number;
   logged_at: string;
   meal_type: "breakfast" | "lunch" | "dinner" | "snack" | null;
+  display_order?: number;
   food_name: string;
   serving_size?: string;
   calories: number;
