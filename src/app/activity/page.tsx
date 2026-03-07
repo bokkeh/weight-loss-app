@@ -41,6 +41,8 @@ interface GeneratedWorkout {
 }
 
 const STEP_KEY_PREFIX = "activity_steps_v1_";
+const GENERATED_WORKOUT_KEY = "activity_generated_workout_v1";
+const GENERATED_WORKOUT_CHECKED_KEY = "activity_generated_workout_checked_v1";
 
 function localDateKey() {
   const now = new Date();
@@ -80,12 +82,48 @@ export default function ActivityPage() {
     const parsed = Number(raw ?? 0);
     if (Number.isFinite(parsed) && parsed > 0) setSteps(Math.floor(parsed));
     setMotionSupported(typeof window !== "undefined" && "DeviceMotionEvent" in window);
+
+    const savedWorkoutRaw = localStorage.getItem(GENERATED_WORKOUT_KEY);
+    if (savedWorkoutRaw) {
+      try {
+        const savedWorkout = JSON.parse(savedWorkoutRaw) as GeneratedWorkout;
+        if (savedWorkout?.title && Array.isArray(savedWorkout?.checklist)) {
+          setGeneratedWorkout(savedWorkout);
+        }
+      } catch {
+        localStorage.removeItem(GENERATED_WORKOUT_KEY);
+      }
+    }
+
+    const savedCheckedRaw = localStorage.getItem(GENERATED_WORKOUT_CHECKED_KEY);
+    if (savedCheckedRaw) {
+      try {
+        const savedChecked = JSON.parse(savedCheckedRaw) as Record<number, boolean>;
+        if (savedChecked && typeof savedChecked === "object") {
+          setCheckedItems(savedChecked);
+        }
+      } catch {
+        localStorage.removeItem(GENERATED_WORKOUT_CHECKED_KEY);
+      }
+    }
   }, []);
 
   useEffect(() => {
     const key = `${STEP_KEY_PREFIX}${stepDateKeyRef.current}`;
     localStorage.setItem(key, String(steps));
   }, [steps]);
+
+  useEffect(() => {
+    if (generatedWorkout) {
+      localStorage.setItem(GENERATED_WORKOUT_KEY, JSON.stringify(generatedWorkout));
+    } else {
+      localStorage.removeItem(GENERATED_WORKOUT_KEY);
+    }
+  }, [generatedWorkout]);
+
+  useEffect(() => {
+    localStorage.setItem(GENERATED_WORKOUT_CHECKED_KEY, JSON.stringify(checkedItems));
+  }, [checkedItems]);
 
   useEffect(() => {
     async function load() {
@@ -200,6 +238,13 @@ export default function ActivityPage() {
     }
   }
 
+  function clearGeneratedWorkout() {
+    setGeneratedWorkout(null);
+    setCheckedItems({});
+    localStorage.removeItem(GENERATED_WORKOUT_KEY);
+    localStorage.removeItem(GENERATED_WORKOUT_CHECKED_KEY);
+  }
+
   return (
     <div className="space-y-5">
       <div>
@@ -265,9 +310,20 @@ export default function ActivityPage() {
                   </div>
                   <span className="text-xs text-muted-foreground">min</span>
                 </div>
+                {generatedWorkout ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-3 text-xs"
+                    onClick={clearGeneratedWorkout}
+                    disabled={genLoading}
+                  >
+                    Clear
+                  </Button>
+                ) : null}
                 <Button size="sm" className="h-7 px-3 text-xs" onClick={generateWorkout} disabled={genLoading}>
                   {genLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}
-                  Generate Workout
+                  {generatedWorkout ? "Regenerate" : "Generate Workout"}
                 </Button>
               </div>
               <div className="flex items-end gap-2">
