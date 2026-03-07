@@ -167,6 +167,19 @@ export async function POST(req: Request) {
     `;
 
     await sql`
+      CREATE TABLE IF NOT EXISTS grocery_items (
+        id          SERIAL PRIMARY KEY,
+        user_id     INTEGER NOT NULL,
+        name        TEXT NOT NULL,
+        quantity    TEXT,
+        checked     BOOLEAN NOT NULL DEFAULT FALSE,
+        source      TEXT NOT NULL DEFAULT 'manual',
+        recipe_id   INTEGER,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+
+    await sql`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_user_profiles_email_unique
         ON user_profiles (LOWER(email))
         WHERE email IS NOT NULL
@@ -190,6 +203,11 @@ export async function POST(req: Request) {
     await sql`
       CREATE INDEX IF NOT EXISTS idx_feature_requests_user_time
         ON feature_requests (user_id, created_at DESC)
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_grocery_items_user_checked_created
+        ON grocery_items (user_id, checked, created_at DESC)
     `;
 
     await sql`

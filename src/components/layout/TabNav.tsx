@@ -25,6 +25,7 @@ import {
   LogOut,
   Shield,
   Lightbulb,
+  ShoppingBasket,
 } from "lucide-react";
 import { FoodLogEntry, WeightEntry } from "@/types";
 
@@ -34,6 +35,7 @@ const tabs = [
   { href: "/food-log", label: "Food Log", icon: UtensilsCrossed },
   { href: "/chat", label: "AI Coach", icon: MessageCircle },
   { href: "/recipes", label: "Recipes", icon: BookOpen },
+  { href: "/grocery", label: "Grocery", icon: ShoppingBasket },
 ];
 
 const profileTab = { href: "/profile", label: "Profile", icon: User };

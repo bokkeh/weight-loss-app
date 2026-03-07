@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { RecipeForm } from "./RecipeForm";
 import { Recipe } from "@/types";
-import { Pencil, Trash2, UtensilsCrossed } from "lucide-react";
+import { Pencil, ShoppingBasket, Trash2, UtensilsCrossed } from "lucide-react";
 
 interface Props {
   recipe: Recipe | null;
@@ -21,6 +21,7 @@ interface Props {
   onUpdated: (r: Recipe) => void;
   onDeleted: (id: number) => void;
   onLogAsFood: (r: Recipe) => void;
+  onAddToGrocery: (r: Recipe) => void;
 }
 
 export function RecipeDetail({
@@ -30,6 +31,7 @@ export function RecipeDetail({
   onUpdated,
   onDeleted,
   onLogAsFood,
+  onAddToGrocery,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -157,6 +159,14 @@ export function RecipeDetail({
             >
               <UtensilsCrossed className="h-4 w-4 mr-2" />
               Log as Food
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => onAddToGrocery(recipe)}
+              className="w-full"
+            >
+              <ShoppingBasket className="h-4 w-4 mr-2" />
+              Add Ingredients to Grocery
             </Button>
             <div className="flex gap-2">
               <Button

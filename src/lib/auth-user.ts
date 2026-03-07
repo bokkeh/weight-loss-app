@@ -115,6 +115,19 @@ async function ensureMultiUserSchemaInternal() {
     )
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS grocery_items (
+      id          SERIAL PRIMARY KEY,
+      user_id     INTEGER NOT NULL,
+      name        TEXT NOT NULL,
+      quantity    TEXT,
+      checked     BOOLEAN NOT NULL DEFAULT FALSE,
+      source      TEXT NOT NULL DEFAULT 'manual',
+      recipe_id   INTEGER,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
 
   await sql`
     CREATE INDEX IF NOT EXISTS idx_auth_login_events_user_time
@@ -124,6 +137,11 @@ async function ensureMultiUserSchemaInternal() {
   await sql`
     CREATE INDEX IF NOT EXISTS idx_feature_requests_user_time
       ON feature_requests (user_id, created_at DESC)
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_grocery_items_user_checked_created
+      ON grocery_items (user_id, checked, created_at DESC)
   `;
 
   // Optional analytics table for sign-in page traffic.

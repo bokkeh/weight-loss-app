@@ -50,6 +50,7 @@ export default function RecipesPage() {
   const [exploreOpen, setExploreOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [logSuccess, setLogSuccess] = useState("");
+  const [grocerySuccess, setGrocerySuccess] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -108,6 +109,23 @@ export default function RecipesPage() {
     setDetailOpen(false);
     setLogSuccess(`"${recipe.name}" logged to today's food diary!`);
     setTimeout(() => setLogSuccess(""), 4000);
+  }
+
+  async function handleAddToGrocery(recipe: Recipe) {
+    const res = await fetch("/api/grocery", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipe_id: recipe.id }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(data.error ?? "Failed to add recipe ingredients to grocery list.");
+      return;
+    }
+    const count = Array.isArray(data) ? data.length : 0;
+    setDetailOpen(false);
+    setGrocerySuccess(`Added ${count} ingredient${count === 1 ? "" : "s"} from "${recipe.name}" to Grocery.`);
+    setTimeout(() => setGrocerySuccess(""), 4000);
   }
 
   const allTags = useMemo(() => {
@@ -223,6 +241,11 @@ export default function RecipesPage() {
           {logSuccess}
         </div>
       )}
+      {grocerySuccess && (
+        <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-800 font-medium">
+          {grocerySuccess}
+        </div>
+      )}
 
       {/* Search + Sort */}
       <div className="flex gap-2">
@@ -322,6 +345,7 @@ export default function RecipesPage() {
         onUpdated={handleUpdated}
         onDeleted={handleDeleted}
         onLogAsFood={handleLogAsFood}
+        onAddToGrocery={handleAddToGrocery}
       />
     </div>
   );
