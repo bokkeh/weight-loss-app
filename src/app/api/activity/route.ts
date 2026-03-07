@@ -118,7 +118,11 @@ export async function GET(req: Request) {
   const { userId } = authState;
 
   try {
-    const startDate = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const { searchParams } = new URL(req.url);
+    const requestedHours = Number(searchParams.get("hours") ?? 72);
+    const windowHours = requestedHours === 24 ? 24 : 72;
+    const windowDays = Math.max(1, Math.ceil(windowHours / 24));
+    const startDate = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     const [foodAgg] = await sql`
       SELECT
@@ -171,13 +175,13 @@ export async function GET(req: Request) {
     const foodDays = Math.max(Number(foodAgg?.active_days ?? 0), 1);
     const avgCalories = Number(foodAgg?.calories_total ?? 0) / foodDays;
     const avgProtein = Number(foodAgg?.protein_total ?? 0) / foodDays;
-    const avgWater = Number(waterAgg?.ounces_total ?? 0) / 3;
+    const avgWater = Number(waterAgg?.ounces_total ?? 0) / windowDays;
     const activeDays = Number(foodAgg?.active_days ?? 0);
 
     const calorieRatio = goals.calories > 0 ? avgCalories / goals.calories : 1;
     const proteinRatio = goals.protein_g > 0 ? avgProtein / goals.protein_g : 1;
     const hydrationRatio = avgWater / 80;
-    const consistencyRatio = activeDays / 3;
+    const consistencyRatio = activeDays / windowDays;
 
     const calorieScore = 1 - clamp(Math.abs(1 - calorieRatio), 0, 1);
     const proteinScore = clamp(proteinRatio, 0, 1);
@@ -194,7 +198,7 @@ export async function GET(req: Request) {
 
     const insights: string[] = [];
     if (proteinRatio < 0.75) {
-      insights.push("Protein has been low over the last 72 hours. Keep sessions shorter and emphasize recovery.");
+      insights.push(`Protein has been low over the last ${windowHours} hours. Keep sessions shorter and emphasize recovery.`);
     }
     if (hydrationRatio < 0.8) {
       insights.push("Hydration is behind target. Add 16-24 oz water pre-workout and keep intensity moderate.");
@@ -209,7 +213,7 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({
-      window_hours: 72,
+      window_hours: windowHours,
       readiness,
       intensity,
       metrics: {
@@ -227,4 +231,3 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }
-

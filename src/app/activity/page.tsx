@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dumbbell, Droplets, Footprints, Flame, Loader2 } from "lucide-react";
+import { Beef, Dumbbell, Droplets, Footprints, Flame, Loader2, Scale, TrendingDown } from "lucide-react";
 
 type Intensity = "low" | "moderate" | "high";
 
@@ -50,6 +50,7 @@ export default function ActivityPage() {
   const [data, setData] = useState<ActivityData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [windowHours, setWindowHours] = useState<24 | 72>(72);
   const [steps, setSteps] = useState(0);
   const [tracking, setTracking] = useState(false);
   const [motionSupported, setMotionSupported] = useState(false);
@@ -77,7 +78,7 @@ export default function ActivityPage() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch("/api/activity", { cache: "no-store" });
+        const res = await fetch(`/api/activity?hours=${windowHours}`, { cache: "no-store" });
         const raw = await res.text().catch(() => "");
         const parsed = raw ? (JSON.parse(raw) as ActivityData | { error?: string }) : null;
         if (!res.ok) {
@@ -91,7 +92,7 @@ export default function ActivityPage() {
       }
     }
     load().catch(() => undefined);
-  }, []);
+  }, [windowHours]);
 
   useEffect(() => {
     if (!tracking) return;
@@ -161,7 +162,7 @@ export default function ActivityPage() {
       <div>
         <h1 className="text-2xl font-bold">Activity</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Workout guidance based on your last 72 hours of nutrition and hydration.
+          Workout guidance based on your recent nutrition and hydration.
         </p>
       </div>
 
@@ -187,24 +188,78 @@ export default function ActivityPage() {
             </CardHeader>
             <CardContent className="pt-0 space-y-3">
               <div className="flex items-center gap-2">
-                <Badge variant="outline">Last {data.window_hours}h</Badge>
+                <Button
+                  size="sm"
+                  variant={windowHours === 24 ? "default" : "outline"}
+                  className="h-7 px-3 text-xs"
+                  onClick={() => setWindowHours(24)}
+                >
+                  Last 24h
+                </Button>
+                <Button
+                  size="sm"
+                  variant={windowHours === 72 ? "default" : "outline"}
+                  className="h-7 px-3 text-xs"
+                  onClick={() => setWindowHours(72)}
+                >
+                  Last 72h
+                </Button>
                 <Badge variant="secondary" className="capitalize">
                   {data.intensity} intensity
                 </Badge>
               </div>
-              <p className="text-3xl font-bold">{data.readiness}/100</p>
-              <div className="grid sm:grid-cols-3 gap-2 text-sm">
+              <div className="flex items-end gap-2">
+                <p className="text-6xl font-black leading-none">{data.readiness}%</p>
+                <p className="text-xs text-muted-foreground pb-1">readiness</p>
+              </div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
                 <div className="rounded-lg border p-3">
-                  <p className="text-muted-foreground flex items-center gap-1"><Flame className="h-3.5 w-3.5" /> Avg calories/day</p>
-                  <p className="font-semibold">{data.metrics.avg_calories_per_day}</p>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-muted-foreground">Avg calories/day</p>
+                      <p className="font-semibold">{data.metrics.avg_calories_per_day}</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-orange-50">
+                      <Flame className="h-4 w-4 text-orange-600" />
+                    </div>
+                  </div>
                 </div>
                 <div className="rounded-lg border p-3">
-                  <p className="text-muted-foreground">Avg protein/day</p>
-                  <p className="font-semibold">{data.metrics.avg_protein_g_per_day} g</p>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-muted-foreground">Avg protein/day</p>
+                      <p className="font-semibold">{data.metrics.avg_protein_g_per_day} g</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-purple-50">
+                      <Beef className="h-4 w-4 text-purple-600" />
+                    </div>
+                  </div>
                 </div>
                 <div className="rounded-lg border p-3">
-                  <p className="text-muted-foreground flex items-center gap-1"><Droplets className="h-3.5 w-3.5" /> Avg water/day</p>
-                  <p className="font-semibold">{data.metrics.avg_water_oz_per_day} oz</p>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-muted-foreground">Avg water/day</p>
+                      <p className="font-semibold">{data.metrics.avg_water_oz_per_day} oz</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-blue-50">
+                      <Droplets className="h-4 w-4 text-blue-600" />
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-muted-foreground">Active days</p>
+                      <p className="font-semibold">{data.metrics.active_days}</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-green-50">
+                      {data.intensity === "high" ? (
+                        <TrendingDown className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Scale className="h-4 w-4 text-green-600" />
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="space-y-1">
@@ -261,21 +316,35 @@ export default function ActivityPage() {
 
           <div className="grid gap-3">
             {data.recommendations.map((plan, idx) => (
-              <Card key={`${plan.title}-${idx}`}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">{plan.title}</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <Badge variant="outline" className="capitalize">{plan.equipment}</Badge>
-                    <Badge variant="secondary">{plan.duration_min} min</Badge>
+              <Card key={`${plan.title}-${idx}`} className="overflow-hidden border-slate-200">
+                <CardHeader
+                  className={`pb-3 ${
+                    plan.equipment === "dumbbells"
+                      ? "bg-gradient-to-r from-blue-50 to-indigo-50"
+                      : "bg-gradient-to-r from-emerald-50 to-teal-50"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <CardTitle className="text-lg">{plan.title}</CardTitle>
+                    <Badge variant="outline" className="capitalize bg-white/70 border-white">
+                      {plan.equipment}
+                    </Badge>
                   </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs pt-1">
+                    <Badge variant="secondary">{plan.duration_min} min</Badge>
+                    <Badge variant="secondary" className="capitalize">{plan.level}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-3">
                   <p className="text-sm text-muted-foreground">{plan.reason}</p>
-                  <ul className="text-sm space-y-1">
+                  <div className="space-y-2">
                     {plan.moves.map((move, moveIdx) => (
-                      <li key={moveIdx}>- {move}</li>
+                      <div key={moveIdx} className="rounded-md border bg-muted/25 px-3 py-2 text-sm">
+                        <span className="text-muted-foreground mr-2 font-medium">{moveIdx + 1}.</span>
+                        {move}
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -285,4 +354,3 @@ export default function ActivityPage() {
     </div>
   );
 }
-
