@@ -375,10 +375,10 @@ export default function GroceryPage() {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-2">
           <CardTitle className="text-base">Quick Add</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 pt-0">
           <div className="grid sm:grid-cols-[1fr_180px_auto] gap-2">
             <Input placeholder="Add item (e.g., eggs)" value={manualName} onChange={(e) => setManualName(e.target.value)} />
             <Input placeholder="Quantity (optional)" value={manualQty} onChange={(e) => setManualQty(e.target.value)} />
