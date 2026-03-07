@@ -22,7 +22,7 @@ interface GroceryItem {
   created_at: string;
 }
 
-type GroceryGroupKey = "liked" | "fruits" | "veggies" | "breads" | "meats" | "dairy" | "spices_sauces" | "misc";
+type GroceryGroupKey = "liked" | "fruits" | "veggies" | "breads" | "meats" | "dairy" | "spices_sauces" | "sweets" | "misc";
 
 const GROUP_LABELS: Record<GroceryGroupKey, string> = {
   liked: "Liked Items",
@@ -32,6 +32,7 @@ const GROUP_LABELS: Record<GroceryGroupKey, string> = {
   meats: "Meats",
   dairy: "Dairy",
   spices_sauces: "Spices/Sauces",
+  sweets: "Sweets",
   misc: "Miscellaneous",
 };
 
@@ -42,6 +43,7 @@ const EDITABLE_CATEGORY_KEYS: GroceryGroupKey[] = [
   "meats",
   "dairy",
   "spices_sauces",
+  "sweets",
   "misc",
 ];
 
@@ -53,6 +55,7 @@ function inferGroup(name: string): GroceryGroupKey {
   if (/\b(chicken|turkey|beef|steak|pork|ham|sausage|bacon|salmon|tuna|fish|shrimp|meat)\b/.test(value)) return "meats";
   if (/\b(milk|cheese|yogurt|butter|cream|cottage|egg|eggs|dairy)\b/.test(value)) return "dairy";
   if (/\b(spice|spices|salt|pepper|paprika|cumin|garlic powder|onion powder|oregano|basil|sauce|ketchup|mustard|mayo|soy|hot sauce|salsa|vinaigrette)\b/.test(value)) return "spices_sauces";
+  if (/\b(cookie|cookies|candy|chocolate|dessert|ice cream|brownie|cake|donut|doughnut|pastry|sweet)\b/.test(value)) return "sweets";
   return "misc";
 }
 
@@ -341,6 +344,7 @@ export default function GroceryPage() {
       meats: [],
       dairy: [],
       spices_sauces: [],
+      sweets: [],
       misc: [],
     };
     const sorted = [...items].sort((a, b) => Number(a.checked) - Number(b.checked));
