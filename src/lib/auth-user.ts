@@ -122,6 +122,7 @@ async function ensureMultiUserSchemaInternal() {
       name        TEXT NOT NULL,
       quantity    TEXT,
       liked       BOOLEAN NOT NULL DEFAULT FALSE,
+      category    TEXT,
       checked     BOOLEAN NOT NULL DEFAULT FALSE,
       source      TEXT NOT NULL DEFAULT 'manual',
       recipe_id   INTEGER,
@@ -129,6 +130,7 @@ async function ensureMultiUserSchemaInternal() {
     )
   `;
   await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS liked BOOLEAN NOT NULL DEFAULT FALSE`;
+  await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS category TEXT`;
 
 
   await sql`

@@ -173,6 +173,7 @@ export async function POST(req: Request) {
         name        TEXT NOT NULL,
         quantity    TEXT,
         liked       BOOLEAN NOT NULL DEFAULT FALSE,
+        category    TEXT,
         checked     BOOLEAN NOT NULL DEFAULT FALSE,
         source      TEXT NOT NULL DEFAULT 'manual',
         recipe_id   INTEGER,
@@ -180,6 +181,7 @@ export async function POST(req: Request) {
       )
     `;
     await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS liked BOOLEAN NOT NULL DEFAULT FALSE`;
+    await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS category TEXT`;
 
     await sql`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_user_profiles_email_unique

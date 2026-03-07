@@ -17,6 +17,14 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
     const checked = typeof body.checked === "boolean" ? body.checked : null;
     const liked = typeof body.liked === "boolean" ? body.liked : null;
+    const validCategories = new Set(["fruits", "veggies", "breads", "meats", "dairy", "spices_sauces", "misc"]);
+    const categoryProvided = Object.prototype.hasOwnProperty.call(body, "category");
+    const category =
+      typeof body.category === "string" && validCategories.has(body.category)
+        ? body.category
+        : body.category === null
+          ? null
+          : undefined;
     const name = typeof body.name === "string" ? body.name.trim() : null;
     const quantity = typeof body.quantity === "string" ? body.quantity.trim() : null;
 
@@ -25,10 +33,14 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
       SET
         checked = COALESCE(${checked}, checked),
         liked = COALESCE(${liked}, liked),
+        category = CASE
+          WHEN ${categoryProvided} THEN ${category ?? null}
+          ELSE category
+        END,
         name = COALESCE(${name || null}, name),
         quantity = COALESCE(${quantity || null}, quantity)
       WHERE id = ${itemId} AND user_id = ${userId}
-      RETURNING id, user_id, name, quantity, liked, checked, source, recipe_id, created_at::text
+      RETURNING id, user_id, name, quantity, liked, category, checked, source, recipe_id, created_at::text
     `;
 
     if (!updated) {

@@ -22,6 +22,7 @@ async function ensureGroceryTable() {
       name        TEXT NOT NULL,
       quantity    TEXT,
       liked       BOOLEAN NOT NULL DEFAULT FALSE,
+      category    TEXT,
       checked     BOOLEAN NOT NULL DEFAULT FALSE,
       source      TEXT NOT NULL DEFAULT 'manual',
       recipe_id   INTEGER,
@@ -29,6 +30,7 @@ async function ensureGroceryTable() {
     )
   `;
   await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS liked BOOLEAN NOT NULL DEFAULT FALSE`;
+  await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS category TEXT`;
   await sql`
     CREATE INDEX IF NOT EXISTS idx_grocery_items_user_checked_created
       ON grocery_items (user_id, checked, created_at DESC)
@@ -43,7 +45,7 @@ export async function GET(req: Request) {
   try {
     await ensureGroceryTable();
     const items = await sql`
-      SELECT id, user_id, name, quantity, liked, checked, source, recipe_id, created_at::text
+      SELECT id, user_id, name, quantity, liked, category, checked, source, recipe_id, created_at::text
       FROM grocery_items
       WHERE user_id = ${userId}
       ORDER BY checked ASC, created_at DESC
@@ -85,7 +87,7 @@ export async function POST(req: Request) {
         const [row] = await sql`
           INSERT INTO grocery_items (user_id, name, quantity, source, recipe_id)
           VALUES (${userId}, ${item.name}, ${item.quantity}, 'recipe', ${recipeId})
-          RETURNING id, user_id, name, quantity, liked, checked, source, recipe_id, created_at::text
+          RETURNING id, user_id, name, quantity, liked, category, checked, source, recipe_id, created_at::text
         `;
         inserted.push(row);
       }
@@ -103,7 +105,7 @@ export async function POST(req: Request) {
         const [row] = await sql`
           INSERT INTO grocery_items (user_id, name, quantity, source)
           VALUES (${userId}, ${name}, ${quantity}, 'ai')
-          RETURNING id, user_id, name, quantity, liked, checked, source, recipe_id, created_at::text
+          RETURNING id, user_id, name, quantity, liked, category, checked, source, recipe_id, created_at::text
         `;
         inserted.push(row);
       }
@@ -119,7 +121,7 @@ export async function POST(req: Request) {
     const [created] = await sql`
       INSERT INTO grocery_items (user_id, name, quantity, source)
       VALUES (${userId}, ${name}, ${quantity}, 'manual')
-      RETURNING id, user_id, name, quantity, liked, checked, source, recipe_id, created_at::text
+      RETURNING id, user_id, name, quantity, liked, category, checked, source, recipe_id, created_at::text
     `;
     return NextResponse.json(created, { status: 201 });
   } catch (error) {

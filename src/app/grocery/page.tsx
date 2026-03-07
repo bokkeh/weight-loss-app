@@ -13,13 +13,14 @@ interface GroceryItem {
   name: string;
   quantity: string | null;
   liked: boolean;
+  category?: GroceryGroupKey | null;
   checked: boolean;
   source: string;
   recipe_id?: number | null;
   created_at: string;
 }
 
-type GroceryGroupKey = "liked" | "fruits" | "veggies" | "breads" | "meats" | "dairy" | "misc";
+type GroceryGroupKey = "liked" | "fruits" | "veggies" | "breads" | "meats" | "dairy" | "spices_sauces" | "misc";
 
 const GROUP_LABELS: Record<GroceryGroupKey, string> = {
   liked: "Liked Items",
@@ -28,6 +29,7 @@ const GROUP_LABELS: Record<GroceryGroupKey, string> = {
   breads: "Breads",
   meats: "Meats",
   dairy: "Dairy",
+  spices_sauces: "Spices/Sauces",
   misc: "Miscellaneous",
 };
 
@@ -38,6 +40,7 @@ function inferGroup(name: string): GroceryGroupKey {
   if (/\b(bread|bagel|bun|roll|tortilla|pita|sourdough|baguette|toast)\b/.test(value)) return "breads";
   if (/\b(chicken|turkey|beef|steak|pork|ham|sausage|bacon|salmon|tuna|fish|shrimp|meat)\b/.test(value)) return "meats";
   if (/\b(milk|cheese|yogurt|butter|cream|cottage|egg|eggs|dairy)\b/.test(value)) return "dairy";
+  if (/\b(spice|spices|salt|pepper|paprika|cumin|garlic powder|onion powder|oregano|basil|sauce|ketchup|mustard|mayo|soy|hot sauce|salsa|vinaigrette)\b/.test(value)) return "spices_sauces";
   return "misc";
 }
 
@@ -112,6 +115,8 @@ export default function GroceryPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [quantityDraft, setQuantityDraft] = useState("");
   const [quantitySavingId, setQuantitySavingId] = useState<number | null>(null);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [dragOverGroup, setDragOverGroup] = useState<GroceryGroupKey | null>(null);
 
   async function fetchItems() {
     setLoading(true);
@@ -202,6 +207,22 @@ export default function GroceryPage() {
     }
   }
 
+  async function moveItemToGroup(item: GroceryItem, group: GroceryGroupKey) {
+    const payload =
+      group === "liked"
+        ? { liked: true, category: null }
+        : { liked: false, category: group };
+    const res = await fetch(`/api/grocery/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const updated = await readJsonSafe<GroceryItem>(res);
+    if (res.ok && updated) {
+      setItems((prev) => prev.map((it) => (it.id === updated.id ? updated : it)));
+    }
+  }
+
   async function deleteItem(id: number) {
     await fetch(`/api/grocery/${id}`, { method: "DELETE" });
     setItems((prev) => prev.filter((it) => it.id !== id));
@@ -262,6 +283,7 @@ export default function GroceryPage() {
       breads: [],
       meats: [],
       dairy: [],
+      spices_sauces: [],
       misc: [],
     };
     const sorted = [...items].sort((a, b) => Number(a.checked) - Number(b.checked));
@@ -269,7 +291,8 @@ export default function GroceryPage() {
       if (item.liked) {
         groups.liked.push(item);
       } else {
-        groups[inferGroup(item.name)].push(item);
+        const explicit = item.category && groups[item.category] ? item.category : null;
+        groups[explicit ?? inferGroup(item.name)].push(item);
       }
     }
     return groups;
@@ -335,7 +358,29 @@ export default function GroceryPage() {
                 const group = groupedItems[groupKey];
                 if (group.length === 0) return null;
                 return (
-                  <div key={groupKey} className="space-y-2">
+                  <div
+                    key={groupKey}
+                    className={`space-y-2 rounded-xl p-1 transition-colors ${
+                      dragOverGroup === groupKey ? "bg-muted/40" : ""
+                    }`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (dragOverGroup !== groupKey) setDragOverGroup(groupKey);
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverGroup === groupKey) setDragOverGroup(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const id = Number(e.dataTransfer.getData("text/plain") || draggingId);
+                      const item = items.find((it) => it.id === id);
+                      if (item) {
+                        moveItemToGroup(item, groupKey).catch(() => undefined);
+                      }
+                      setDragOverGroup(null);
+                      setDraggingId(null);
+                    }}
+                  >
                     <div className="px-1">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">
                         {GROUP_LABELS[groupKey]} ({group.length})
@@ -344,9 +389,18 @@ export default function GroceryPage() {
                     {group.map((item) => (
                       <div
                         key={item.id}
+                        draggable
+                        onDragStart={(e) => {
+                          setDraggingId(item.id);
+                          e.dataTransfer.setData("text/plain", String(item.id));
+                        }}
+                        onDragEnd={() => {
+                          setDraggingId(null);
+                          setDragOverGroup(null);
+                        }}
                         className={`rounded-xl border p-3 flex items-center gap-3 ${
                           item.checked ? "bg-green-50/50 border-green-200" : "bg-white"
-                        }`}
+                        } ${draggingId === item.id ? "opacity-60" : ""}`}
                       >
                         <button type="button" onClick={() => toggleItem(item)} className="shrink-0">
                           {item.checked ? (
