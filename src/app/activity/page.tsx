@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Beef, Dumbbell, Droplets, Footprints, Flame, Loader2, Scale, TrendingDown } from "lucide-react";
+import { Beef, CheckSquare, Dumbbell, Droplets, Footprints, Flame, Loader2, Scale, Sparkles, Square, TrendingDown } from "lucide-react";
 
 type Intensity = "low" | "moderate" | "high";
 
@@ -30,6 +30,15 @@ interface ActivityData {
   }>;
 }
 
+interface GeneratedWorkout {
+  title: string;
+  duration_min: number;
+  equipment: "bodyweight" | "dumbbells" | "mixed";
+  focus: string;
+  notes: string;
+  checklist: string[];
+}
+
 const STEP_KEY_PREFIX = "activity_steps_v1_";
 
 function localDateKey() {
@@ -51,6 +60,9 @@ export default function ActivityPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [windowHours, setWindowHours] = useState<24 | 72>(72);
+  const [genLoading, setGenLoading] = useState(false);
+  const [generatedWorkout, setGeneratedWorkout] = useState<GeneratedWorkout | null>(null);
+  const [checkedItems, setCheckedItems] = useState<Record<number, boolean>>({});
   const [steps, setSteps] = useState(0);
   const [tracking, setTracking] = useState(false);
   const [motionSupported, setMotionSupported] = useState(false);
@@ -157,6 +169,34 @@ export default function ActivityPage() {
   const stepTarget = targetStepsFor(data?.intensity ?? "moderate");
   const progressPct = useMemo(() => Math.min(100, Math.round((steps / stepTarget) * 100)), [steps, stepTarget]);
 
+  async function generateWorkout() {
+    if (!data) return;
+    setGenLoading(true);
+    try {
+      const res = await fetch("/api/activity/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          window_hours: data.window_hours,
+          intensity: data.intensity,
+          insights: data.insights,
+          top_foods: data.top_foods,
+        }),
+      });
+      const raw = await res.text().catch(() => "");
+      const parsed = raw ? (JSON.parse(raw) as GeneratedWorkout | { error?: string }) : null;
+      if (!res.ok) {
+        throw new Error((parsed as { error?: string } | null)?.error ?? "Failed to generate workout.");
+      }
+      setGeneratedWorkout(parsed as GeneratedWorkout);
+      setCheckedItems({});
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to generate workout.");
+    } finally {
+      setGenLoading(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div>
@@ -207,6 +247,10 @@ export default function ActivityPage() {
                 <Badge variant="secondary" className="capitalize">
                   {data.intensity} intensity
                 </Badge>
+                <Button size="sm" className="h-7 px-3 text-xs ml-auto" onClick={generateWorkout} disabled={genLoading}>
+                  {genLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}
+                  Generate Workout
+                </Button>
               </div>
               <div className="flex items-end gap-2">
                 <p className="text-6xl font-black leading-none">{data.readiness}%</p>
@@ -315,8 +359,55 @@ export default function ActivityPage() {
           </Card>
 
           <div className="grid gap-3">
+            {generatedWorkout && (
+              <Card className="overflow-hidden !py-0 gap-0 border-violet-200">
+                <CardHeader className="pb-3 bg-gradient-to-r from-violet-50 to-fuchsia-50">
+                  <div className="flex items-start justify-between gap-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-violet-600" />
+                      {generatedWorkout.title}
+                    </CardTitle>
+                    <Badge variant="outline" className="capitalize bg-white/70 border-white">
+                      {generatedWorkout.equipment}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs pt-1">
+                    <Badge variant="secondary">{generatedWorkout.duration_min} min</Badge>
+                    <Badge variant="secondary">{generatedWorkout.focus}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Check off each line as you complete it.
+                  </p>
+                  <div className="space-y-2">
+                    {generatedWorkout.checklist.map((item, idx) => {
+                      const checked = Boolean(checkedItems[idx]);
+                      return (
+                        <button
+                          key={`${item}-${idx}`}
+                          type="button"
+                          onClick={() => setCheckedItems((prev) => ({ ...prev, [idx]: !prev[idx] }))}
+                          className="w-full text-left rounded-md border bg-muted/20 px-3 py-2 text-sm flex items-center gap-2"
+                        >
+                          {checked ? (
+                            <CheckSquare className="h-4 w-4 text-emerald-600 shrink-0" />
+                          ) : (
+                            <Square className="h-4 w-4 text-muted-foreground shrink-0" />
+                          )}
+                          <span className={checked ? "line-through text-muted-foreground" : ""}>{item}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {generatedWorkout.notes ? (
+                    <p className="text-xs text-muted-foreground">{generatedWorkout.notes}</p>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
             {data.recommendations.map((plan, idx) => (
-              <Card key={`${plan.title}-${idx}`} className="overflow-hidden border-slate-200">
+              <Card key={`${plan.title}-${idx}`} className="overflow-hidden !py-0 gap-0 border-slate-200">
                 <CardHeader
                   className={`pb-3 ${
                     plan.equipment === "dumbbells"
