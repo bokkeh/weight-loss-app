@@ -355,14 +355,14 @@ export function FoodLogTable({ entries, onDelete, onUpdated, onReordered }: Prop
                 }}
               >
                 {/* Main row */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-1.5 min-w-0">
-                    <GripVertical className="h-4 w-4 text-muted-foreground/60 shrink-0 mt-0.5 cursor-grab" />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <GripVertical className="h-4 w-4 text-muted-foreground/60 shrink-0 cursor-grab" />
                     {entry.source === "ai_chat" && (
-                      <Bot className="h-3.5 w-3.5 text-violet-500 shrink-0 mt-0.5" />
+                      <Bot className="h-3.5 w-3.5 text-violet-500 shrink-0" />
                     )}
                     {entry.source === "recipe" && (
-                      <ChefHat className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                      <ChefHat className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                     )}
                     <div className="min-w-0">
                       <button
@@ -392,7 +392,7 @@ export function FoodLogTable({ entries, onDelete, onUpdated, onReordered }: Prop
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0 self-center"
                     onClick={() => onDelete(entry.id)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
