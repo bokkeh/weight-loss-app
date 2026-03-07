@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { requireUserId } from "@/lib/route-auth";
+import { formatFoodName } from "@/lib/utils";
 
 async function ensureFoodLogColumns() {
   await sql`
@@ -74,6 +75,10 @@ export async function POST(req: Request) {
     if (!food_name) {
       return NextResponse.json({ error: "food_name is required" }, { status: 400 });
     }
+    const normalizedFoodName = formatFoodName(String(food_name));
+    if (!normalizedFoodName) {
+      return NextResponse.json({ error: "food_name is required" }, { status: 400 });
+    }
 
     const resolvedDate = logged_at ?? new Date().toISOString().split("T")[0];
     const [orderRow] = await sql`
@@ -93,7 +98,7 @@ export async function POST(req: Request) {
         ${resolvedDate},
         ${meal_type ?? null},
         ${nextOrder},
-        ${food_name},
+        ${normalizedFoodName},
         ${serving_size ?? null},
         ${Number(calories) || 0},
         ${Number(protein_g) || 0},

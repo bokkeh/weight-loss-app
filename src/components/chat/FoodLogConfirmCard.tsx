@@ -1,5 +1,6 @@
 import { CheckCircle } from "lucide-react";
 import { FoodLogEntry } from "@/types";
+import { formatFoodName } from "@/lib/utils";
 
 interface Props {
   entry: FoodLogEntry;
@@ -14,7 +15,7 @@ export function FoodLogConfirmCard({ entry }: Props) {
           Logged to Food Diary
         </span>
       </div>
-      <p className="text-sm font-medium">{entry.food_name}</p>
+      <p className="text-sm font-medium">{formatFoodName(entry.food_name)}</p>
       {entry.serving_size && (
         <p className="text-xs text-muted-foreground">{entry.serving_size}</p>
       )}

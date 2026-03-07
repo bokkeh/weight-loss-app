@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { estimateMacros, estimateMacrosFromImage, estimateMacrosFromImages } from "@/lib/gemini";
 import { requireUserId } from "@/lib/route-auth";
+import { formatFoodName } from "@/lib/utils";
 
 export async function POST(req: Request) {
   const authState = await requireUserId(req);
@@ -32,6 +33,10 @@ export async function POST(req: Request) {
       : imageBase64
         ? await estimateMacrosFromImage(imageBase64, mimeType ?? "image/jpeg", text?.trim())
         : await estimateMacros(text.trim());
+    const normalizedFoodName = formatFoodName(String(macros.food_name ?? ""));
+    if (!normalizedFoodName) {
+      return NextResponse.json({ error: "Unable to estimate food name" }, { status: 400 });
+    }
 
     const [entry] = await sql`
       INSERT INTO food_log_entries
@@ -40,7 +45,7 @@ export async function POST(req: Request) {
         ${userId},
         ${logged_at ?? new Date().toISOString().split("T")[0]},
         ${macros.meal_type},
-        ${macros.food_name},
+        ${normalizedFoodName},
         ${macros.serving_size ?? null},
         ${macros.calories},
         ${macros.protein_g},

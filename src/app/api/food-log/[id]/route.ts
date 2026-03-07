@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { requireUserId } from "@/lib/route-auth";
+import { formatFoodName } from "@/lib/utils";
 
 async function ensureFoodLogColumns() {
   await sql`
@@ -34,7 +35,9 @@ export async function PATCH(
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const has = (key: string) => Object.prototype.hasOwnProperty.call(body, key);
-    const nextFoodName = has("food_name") ? String(body.food_name ?? "").trim() : String(existing.food_name);
+    const nextFoodName = has("food_name")
+      ? formatFoodName(String(body.food_name ?? ""))
+      : formatFoodName(String(existing.food_name));
     if (!nextFoodName) {
       return NextResponse.json({ error: "food_name is required" }, { status: 400 });
     }

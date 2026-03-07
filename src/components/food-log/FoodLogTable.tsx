@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FoodLogEntry, DailyMacroTotals } from "@/types";
+import { formatFoodName } from "@/lib/utils";
 
 interface Props {
   entries: FoodLogEntry[];
@@ -369,7 +370,7 @@ export function FoodLogTable({ entries, onDelete, onUpdated, onReordered }: Prop
                         onClick={() => setEditingId(editingId === entry.id ? null : entry.id)}
                         className="text-sm font-medium text-left hover:underline underline-offset-2 cursor-pointer leading-snug"
                       >
-                        {entry.food_name}
+                        {formatFoodName(entry.food_name)}
                         {entry.serving_size && (
                           <span className="text-xs text-muted-foreground font-normal ml-1">
                             ({entry.serving_size})

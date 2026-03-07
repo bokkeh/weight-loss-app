@@ -6,6 +6,7 @@ import {
   parseFoodLogBlock,
   stripFoodLogBlock,
 } from "@/lib/gemini";
+import { formatFoodName } from "@/lib/utils";
 
 export async function GET(req: Request) {
   const authState = await requireUserId(req);
@@ -109,6 +110,10 @@ export async function POST(req: Request) {
 
     if (foodPayload) {
       const today = new Date().toISOString().split("T")[0];
+      const normalizedFoodName = formatFoodName(String(foodPayload.food_name ?? ""));
+      if (!normalizedFoodName) {
+        return NextResponse.json({ error: "Unable to parse food name from AI response." }, { status: 400 });
+      }
       const [entry] = await sql`
         INSERT INTO food_log_entries
           (user_id, logged_at, meal_type, food_name, serving_size, calories, protein_g, carbs_g, fat_g, fiber_g, sodium_mg, source)
@@ -116,7 +121,7 @@ export async function POST(req: Request) {
           ${userId},
           ${today},
           ${foodPayload.meal_type},
-          ${foodPayload.food_name},
+          ${normalizedFoodName},
           ${foodPayload.serving_size ?? null},
           ${foodPayload.calories},
           ${foodPayload.protein_g},
