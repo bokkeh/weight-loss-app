@@ -129,6 +129,11 @@ function normalizeCircle(value: unknown): Circle {
   return String(value) === "extended" ? "extended" : "family";
 }
 
+function isValidTimeValue(value: string | null): boolean {
+  if (!value) return false;
+  return /^\d{2}:\d{2}$/.test(value);
+}
+
 export async function GET(req: Request) {
   const auth = await requireUserId(req);
   if ("response" in auth) return auth.response;
@@ -288,6 +293,38 @@ export async function POST(req: Request) {
       const endTime = String(body.end_time ?? "").trim() || null;
       const notes = String(body.notes ?? "").trim() || null;
       if (!kidName) return NextResponse.json({ error: "Kid name is required." }, { status: 400 });
+      if ((startTime && !isValidTimeValue(startTime)) || (endTime && !isValidTimeValue(endTime))) {
+        return NextResponse.json(
+          { error: "Start and end times must use HH:MM format." },
+          { status: 400 }
+        );
+      }
+      if (startTime && endTime && startTime >= endTime) {
+        return NextResponse.json(
+          { error: "End time must be later than start time." },
+          { status: 400 }
+        );
+      }
+      if (startTime && endTime) {
+        const [overlap] = await sql`
+          SELECT id
+          FROM family_kid_naps
+          WHERE family_id = ${familyId}
+            AND LOWER(TRIM(kid_name)) = LOWER(TRIM(${kidName}))
+            AND nap_date = ${napDate}
+            AND start_time IS NOT NULL
+            AND end_time IS NOT NULL
+            AND ${startTime} < end_time
+            AND ${endTime} > start_time
+          LIMIT 1
+        `;
+        if (overlap?.id) {
+          return NextResponse.json(
+            { error: "This nap overlaps an existing nap for that child." },
+            { status: 409 }
+          );
+        }
+      }
       const [row] = await sql`
         INSERT INTO family_kid_naps (family_id, kid_name, nap_date, start_time, end_time, notes, created_by)
         VALUES (${familyId}, ${kidName}, ${napDate}, ${startTime}, ${endTime}, ${notes}, ${userId})
@@ -332,4 +369,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }
-

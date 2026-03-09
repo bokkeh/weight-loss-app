@@ -17,6 +17,8 @@ export const config = {
     "/grocery/:path*",
     "/activity/:path*",
     "/family-space/:path*",
+    "/request-feature/:path*",
+    "/my-data/:path*",
     "/profile/:path*",
     "/admin/:path*",
   ],

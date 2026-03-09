@@ -72,6 +72,7 @@ export default function FamilySpacePage() {
   const [data, setData] = useState<FamilySpaceData | null>(null);
   const [tips, setTips] = useState<{ summary: string; tips: string[]; avoid: string[] } | null>(null);
   const [tipsLoading, setTipsLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteCircle, setInviteCircle] = useState<Circle>("family");
@@ -114,14 +115,29 @@ export default function FamilySpacePage() {
 
   async function runAction(payload: Record<string, unknown>) {
     setSaving(true);
+    setActionMessage("");
     try {
       const res = await fetch("/api/family-space", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error(await res.text());
+      const raw = await res.text().catch(() => "");
+      let parsed: { error?: string } = {};
+      try {
+        parsed = raw ? (JSON.parse(raw) as { error?: string }) : {};
+      } catch {
+        parsed = {};
+      }
+      if (!res.ok) {
+        setActionMessage(parsed.error ?? "Unable to save family update.");
+        return false;
+      }
       await load();
+      return true;
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "Unable to save family update.");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -199,13 +215,14 @@ export default function FamilySpacePage() {
                 <Button
                   disabled={saving || !inviteEmail.trim()}
                   onClick={async () => {
-                    await runAction({ action: "invite", email: inviteEmail.trim(), circle: inviteCircle });
-                    setInviteEmail("");
+                    const ok = await runAction({ action: "invite", email: inviteEmail.trim(), circle: inviteCircle });
+                    if (ok) setInviteEmail("");
                   }}
                 >
                   Invite
                 </Button>
               </div>
+              {actionMessage ? <p className="text-sm text-muted-foreground">{actionMessage}</p> : null}
 
               <div className="grid md:grid-cols-2 gap-3">
                 <div className="rounded-lg border p-3">
@@ -266,7 +283,7 @@ export default function FamilySpacePage() {
                 <Button
                   disabled={saving || !kidName.trim()}
                   onClick={async () => {
-                    await runAction({
+                    const ok = await runAction({
                       action: "add_nap",
                       kid_name: kidName.trim(),
                       nap_date: napDate,
@@ -274,10 +291,12 @@ export default function FamilySpacePage() {
                       end_time: endTime || null,
                       notes: napNotes.trim() || null,
                     });
-                    setKidName("");
-                    setStartTime("");
-                    setEndTime("");
-                    setNapNotes("");
+                    if (ok) {
+                      setKidName("");
+                      setStartTime("");
+                      setEndTime("");
+                      setNapNotes("");
+                    }
                   }}
                 >
                   Save Nap

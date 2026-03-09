@@ -14,6 +14,12 @@ interface AdminUserRow {
   last_login_at: string | null;
   last_activity_at: string | null;
   logins_today: number;
+  share_profile: boolean;
+  share_weight: boolean;
+  share_food: boolean;
+  share_water: boolean;
+  share_recipes: boolean;
+  share_chat: boolean;
   weight_entries: number;
   food_logs: number;
   water_logs: number;
@@ -72,6 +78,20 @@ export default async function AdminPage() {
   if (!isAdminEmail(session?.user?.email)) {
     redirect("/dashboard");
   }
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS user_data_preferences (
+      user_id        INTEGER PRIMARY KEY,
+      share_profile  BOOLEAN NOT NULL DEFAULT TRUE,
+      share_weight   BOOLEAN NOT NULL DEFAULT TRUE,
+      share_food     BOOLEAN NOT NULL DEFAULT TRUE,
+      share_water    BOOLEAN NOT NULL DEFAULT TRUE,
+      share_recipes  BOOLEAN NOT NULL DEFAULT TRUE,
+      share_chat     BOOLEAN NOT NULL DEFAULT TRUE,
+      share_family   BOOLEAN NOT NULL DEFAULT TRUE,
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
 
   async function closeFeatureRequest(formData: FormData) {
     "use server";
@@ -138,31 +158,48 @@ export default async function AdminPage() {
       SELECT user_id, COUNT(*)::int AS chat_messages, MAX(created_at) AS last_chat_at
       FROM chat_messages
       GROUP BY user_id
+    ),
+    pref_agg AS (
+      SELECT
+        user_id,
+        share_profile,
+        share_weight,
+        share_food,
+        share_water,
+        share_recipes,
+        share_chat
+      FROM user_data_preferences
     )
     SELECT
       au.user_id::int AS id,
-      up.first_name,
-      up.last_name,
-      COALESCE(up.email, la.last_login_email) AS email,
-      up.profile_image_url,
+      CASE WHEN COALESCE(pf.share_profile, TRUE) THEN up.first_name ELSE NULL END AS first_name,
+      CASE WHEN COALESCE(pf.share_profile, TRUE) THEN up.last_name ELSE NULL END AS last_name,
+      CASE WHEN COALESCE(pf.share_profile, TRUE) THEN COALESCE(up.email, la.last_login_email) ELSE NULL END AS email,
+      CASE WHEN COALESCE(pf.share_profile, TRUE) THEN up.profile_image_url ELSE NULL END AS profile_image_url,
       la.last_login_at::text,
       NULLIF(
         GREATEST(
           COALESCE(la.last_login_at, to_timestamp(0)),
-          COALESCE(wa.last_weight_at, to_timestamp(0)),
-          COALESCE(fa.last_food_at, to_timestamp(0)),
-          COALESCE(woa.last_water_at, to_timestamp(0)),
-          COALESCE(ra.last_recipe_at, to_timestamp(0)),
-          COALESCE(ca.last_chat_at, to_timestamp(0))
+          CASE WHEN COALESCE(pf.share_weight, TRUE) THEN COALESCE(wa.last_weight_at, to_timestamp(0)) ELSE to_timestamp(0) END,
+          CASE WHEN COALESCE(pf.share_food, TRUE) THEN COALESCE(fa.last_food_at, to_timestamp(0)) ELSE to_timestamp(0) END,
+          CASE WHEN COALESCE(pf.share_water, TRUE) THEN COALESCE(woa.last_water_at, to_timestamp(0)) ELSE to_timestamp(0) END,
+          CASE WHEN COALESCE(pf.share_recipes, TRUE) THEN COALESCE(ra.last_recipe_at, to_timestamp(0)) ELSE to_timestamp(0) END,
+          CASE WHEN COALESCE(pf.share_chat, TRUE) THEN COALESCE(ca.last_chat_at, to_timestamp(0)) ELSE to_timestamp(0) END
         ),
         to_timestamp(0)
       )::text AS last_activity_at,
       COALESCE(la.logins_today, 0)::int AS logins_today,
-      COALESCE(wa.weight_entries, 0)::int AS weight_entries,
-      COALESCE(fa.food_logs, 0)::int AS food_logs,
-      COALESCE(woa.water_logs, 0)::int AS water_logs,
-      COALESCE(ra.recipes, 0)::int AS recipes,
-      COALESCE(ca.chat_messages, 0)::int AS chat_messages
+      COALESCE(pf.share_profile, TRUE) AS share_profile,
+      COALESCE(pf.share_weight, TRUE) AS share_weight,
+      COALESCE(pf.share_food, TRUE) AS share_food,
+      COALESCE(pf.share_water, TRUE) AS share_water,
+      COALESCE(pf.share_recipes, TRUE) AS share_recipes,
+      COALESCE(pf.share_chat, TRUE) AS share_chat,
+      CASE WHEN COALESCE(pf.share_weight, TRUE) THEN COALESCE(wa.weight_entries, 0)::int ELSE 0 END AS weight_entries,
+      CASE WHEN COALESCE(pf.share_food, TRUE) THEN COALESCE(fa.food_logs, 0)::int ELSE 0 END AS food_logs,
+      CASE WHEN COALESCE(pf.share_water, TRUE) THEN COALESCE(woa.water_logs, 0)::int ELSE 0 END AS water_logs,
+      CASE WHEN COALESCE(pf.share_recipes, TRUE) THEN COALESCE(ra.recipes, 0)::int ELSE 0 END AS recipes,
+      CASE WHEN COALESCE(pf.share_chat, TRUE) THEN COALESCE(ca.chat_messages, 0)::int ELSE 0 END AS chat_messages
     FROM all_user_ids au
     LEFT JOIN user_profiles up ON up.id = au.user_id
     LEFT JOIN login_agg la ON la.user_id = au.user_id
@@ -171,6 +208,7 @@ export default async function AdminPage() {
     LEFT JOIN water_agg woa ON woa.user_id = au.user_id
     LEFT JOIN recipe_agg ra ON ra.user_id = au.user_id
     LEFT JOIN chat_agg ca ON ca.user_id = au.user_id
+    LEFT JOIN pref_agg pf ON pf.user_id = au.user_id
     ORDER BY
       GREATEST(
         COALESCE(la.last_login_at, to_timestamp(0)),
@@ -365,9 +403,9 @@ export default async function AdminPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="font-medium truncate">
-                    {[u.first_name, u.last_name].filter(Boolean).join(" ") || "Unnamed User"}
+                    {[u.first_name, u.last_name].filter(Boolean).join(" ") || "Private User"}
                   </p>
-                  <p className="text-xs text-muted-foreground truncate">{u.email ?? "No email"}</p>
+                  <p className="text-xs text-muted-foreground truncate">{u.email ?? "Profile hidden"}</p>
                 </div>
               </div>
               <div className="text-right text-xs text-muted-foreground shrink-0">

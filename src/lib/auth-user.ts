@@ -116,6 +116,20 @@ async function ensureMultiUserSchemaInternal() {
   `;
 
   await sql`
+    CREATE TABLE IF NOT EXISTS user_data_preferences (
+      user_id        INTEGER PRIMARY KEY,
+      share_profile  BOOLEAN NOT NULL DEFAULT TRUE,
+      share_weight   BOOLEAN NOT NULL DEFAULT TRUE,
+      share_food     BOOLEAN NOT NULL DEFAULT TRUE,
+      share_water    BOOLEAN NOT NULL DEFAULT TRUE,
+      share_recipes  BOOLEAN NOT NULL DEFAULT TRUE,
+      share_chat     BOOLEAN NOT NULL DEFAULT TRUE,
+      share_family   BOOLEAN NOT NULL DEFAULT TRUE,
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`
     CREATE TABLE IF NOT EXISTS grocery_items (
       id          SERIAL PRIMARY KEY,
       user_id     INTEGER NOT NULL,
@@ -143,6 +157,11 @@ async function ensureMultiUserSchemaInternal() {
   await sql`
     CREATE INDEX IF NOT EXISTS idx_feature_requests_user_time
       ON feature_requests (user_id, created_at DESC)
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_user_data_preferences_updated_at
+      ON user_data_preferences (updated_at DESC)
   `;
 
   await sql`
