@@ -27,6 +27,7 @@ import {
   Lightbulb,
   ShoppingBasket,
   Dumbbell,
+  UsersRound,
 } from "lucide-react";
 import { FoodLogEntry, WeightEntry } from "@/types";
 
@@ -42,10 +43,12 @@ const tabs = [
 const profileTab = { href: "/profile", label: "Profile", icon: User };
 const featureRequestTab = { href: "/request-feature", label: "Request a Feature", icon: Lightbulb };
 const activityTab = { href: "/activity", label: "Activity", icon: Dumbbell };
+const familySpaceTab = { href: "/family-space", label: "Family Space", icon: UsersRound };
 
 const desktopTabs = [
   ...tabs,
   activityTab,
+  familySpaceTab,
   featureRequestTab,
   { href: "/profile", label: "Profile", icon: User },
 ];
@@ -105,8 +108,8 @@ export function TabNav() {
     : desktopTabs;
 
   const mobileNavItems = isAdmin
-    ? [...tabs, activityTab, featureRequestTab, profileTab, { href: "/admin", label: "Admin", icon: Shield }]
-    : [...tabs, activityTab, featureRequestTab, profileTab];
+    ? [...tabs, activityTab, familySpaceTab, featureRequestTab, profileTab, { href: "/admin", label: "Admin", icon: Shield }]
+    : [...tabs, activityTab, familySpaceTab, featureRequestTab, profileTab];
 
   return (
     <>
