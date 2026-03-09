@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Baby, HeartHandshake, Plus, ShoppingBasket, Trash2, UserPlus } from "lucide-react";
+import { Baby, HeartHandshake, Trash2, UserPlus } from "lucide-react";
 
 type Circle = "family" | "extended";
 
@@ -30,13 +30,6 @@ interface Invite {
   circle: Circle;
   status: string;
   created_at: string;
-}
-
-interface GroceryItem {
-  id: number;
-  name: string;
-  quantity: string | null;
-  checked: boolean;
 }
 
 interface NapLog {
@@ -60,7 +53,6 @@ interface PartnerCycle {
 interface FamilySpaceData {
   members: FamilyMember[];
   invites: Invite[];
-  grocery: GroceryItem[];
   naps: NapLog[];
   cycle: PartnerCycle | null;
 }
@@ -83,9 +75,6 @@ export default function FamilySpacePage() {
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteCircle, setInviteCircle] = useState<Circle>("family");
-
-  const [groceryName, setGroceryName] = useState("");
-  const [groceryQty, setGroceryQty] = useState("");
 
   const [kidName, setKidName] = useState("");
   const [napDate, setNapDate] = useState(new Date().toISOString().slice(0, 10));
@@ -174,7 +163,7 @@ export default function FamilySpacePage() {
       <div>
         <h1 className="text-2xl font-bold">Family Space</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Invite loved ones, collaborate on your shared family list, and track home rhythms together.
+          Invite loved ones, organize family circles, and track home rhythms together.
         </p>
       </div>
 
@@ -250,55 +239,6 @@ export default function FamilySpacePage() {
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <ShoppingBasket className="h-4 w-4" />
-                Shared Family Grocery (Family Circle)
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid sm:grid-cols-[1fr_180px_auto] gap-2">
-                <Input placeholder="Add item" value={groceryName} onChange={(e) => setGroceryName(e.target.value)} />
-                <Input placeholder="Quantity (optional)" value={groceryQty} onChange={(e) => setGroceryQty(e.target.value)} />
-                <Button
-                  disabled={saving || !groceryName.trim()}
-                  onClick={async () => {
-                    await runAction({ action: "add_grocery", name: groceryName.trim(), quantity: groceryQty.trim() || null });
-                    setGroceryName("");
-                    setGroceryQty("");
-                  }}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add
-                </Button>
-              </div>
-              <div className="rounded-lg border divide-y">
-                {data.grocery.length === 0 ? (
-                  <p className="text-sm text-muted-foreground px-3 py-4">No shared items yet.</p>
-                ) : data.grocery.map((item) => (
-                  <div key={item.id} className="px-3 py-2 flex items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      className={`text-left text-sm flex-1 ${item.checked ? "line-through text-muted-foreground" : ""}`}
-                      onClick={() => runAction({ action: "toggle_grocery", id: item.id, checked: !item.checked })}
-                    >
-                      {item.name}{item.quantity ? ` (${item.quantity})` : ""}
-                    </button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => runAction({ action: "delete_grocery", id: item.id })}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
             </CardContent>
           </Card>
 
@@ -433,4 +373,3 @@ export default function FamilySpacePage() {
     </div>
   );
 }
-

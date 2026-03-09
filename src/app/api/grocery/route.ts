@@ -16,9 +16,29 @@ function normalizeIngredientLines(raw: string): Array<{ name: string; quantity: 
 
 async function ensureGroceryTable() {
   await sql`
+    CREATE TABLE IF NOT EXISTS family_groups (
+      id          SERIAL PRIMARY KEY,
+      owner_id    INTEGER NOT NULL,
+      name        TEXT NOT NULL DEFAULT 'My Family',
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS family_memberships (
+      id          SERIAL PRIMARY KEY,
+      family_id   INTEGER NOT NULL REFERENCES family_groups(id) ON DELETE CASCADE,
+      user_id     INTEGER NOT NULL,
+      circle      TEXT NOT NULL CHECK (circle IN ('family', 'extended')),
+      role        TEXT NOT NULL DEFAULT 'member',
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(family_id, user_id)
+    )
+  `;
+  await sql`
     CREATE TABLE IF NOT EXISTS grocery_items (
       id          SERIAL PRIMARY KEY,
       user_id     INTEGER NOT NULL,
+      family_id   INTEGER,
       name        TEXT NOT NULL,
       quantity    TEXT,
       liked       BOOLEAN NOT NULL DEFAULT FALSE,
@@ -33,10 +53,39 @@ async function ensureGroceryTable() {
   await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS liked BOOLEAN NOT NULL DEFAULT FALSE`;
   await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS category TEXT`;
   await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0`;
+  await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS family_id INTEGER`;
   await sql`
     CREATE INDEX IF NOT EXISTS idx_grocery_items_user_checked_created
       ON grocery_items (user_id, checked, created_at DESC)
   `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_grocery_items_family_checked_created
+      ON grocery_items (family_id, checked, created_at DESC)
+  `;
+}
+
+async function resolveGroceryFamilyId(userId: number): Promise<number> {
+  const [member] = await sql`
+    SELECT family_id
+    FROM family_memberships
+    WHERE user_id = ${userId}
+    ORDER BY (role = 'owner') ASC, created_at DESC
+    LIMIT 1
+  `;
+  if (member?.family_id) return Number(member.family_id);
+
+  const [createdFamily] = await sql`
+    INSERT INTO family_groups (owner_id, name)
+    VALUES (${userId}, 'My Family')
+    RETURNING id
+  `;
+  const familyId = Number(createdFamily.id);
+  await sql`
+    INSERT INTO family_memberships (family_id, user_id, circle, role)
+    VALUES (${familyId}, ${userId}, 'family', 'owner')
+    ON CONFLICT (family_id, user_id) DO NOTHING
+  `;
+  return familyId;
 }
 
 export async function GET(req: Request) {
@@ -46,10 +95,17 @@ export async function GET(req: Request) {
 
   try {
     await ensureGroceryTable();
+    const familyId = await resolveGroceryFamilyId(userId);
+    await sql`
+      UPDATE grocery_items
+      SET family_id = ${familyId}
+      WHERE family_id IS NULL
+        AND user_id = ${userId}
+    `;
     const items = await sql`
-      SELECT id, user_id, name, quantity, liked, category, sort_order, checked, source, recipe_id, created_at::text
+      SELECT id, user_id, family_id, name, quantity, liked, category, sort_order, checked, source, recipe_id, created_at::text
       FROM grocery_items
-      WHERE user_id = ${userId}
+      WHERE family_id = ${familyId}
       ORDER BY checked ASC, sort_order ASC, created_at DESC
     `;
     return NextResponse.json(items);
@@ -65,6 +121,13 @@ export async function POST(req: Request) {
 
   try {
     await ensureGroceryTable();
+    const familyId = await resolveGroceryFamilyId(userId);
+    await sql`
+      UPDATE grocery_items
+      SET family_id = ${familyId}
+      WHERE family_id IS NULL
+        AND user_id = ${userId}
+    `;
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
     const recipeId = Number(body.recipe_id);
 
@@ -97,6 +160,11 @@ export async function POST(req: Request) {
           FROM next_sort
           RETURNING id, user_id, name, quantity, liked, category, sort_order, checked, source, recipe_id, created_at::text
         `;
+        await sql`
+          UPDATE grocery_items
+          SET family_id = ${familyId}
+          WHERE id = ${row.id}
+        `;
         inserted.push(row);
       }
       return NextResponse.json(inserted, { status: 201 });
@@ -116,10 +184,10 @@ export async function POST(req: Request) {
             FROM grocery_items
             WHERE user_id = ${userId}
           )
-          INSERT INTO grocery_items (user_id, name, quantity, source, sort_order)
-          SELECT ${userId}, ${name}, ${quantity}, 'ai', next_sort.value
+          INSERT INTO grocery_items (user_id, family_id, name, quantity, source, sort_order)
+          SELECT ${userId}, ${familyId}, ${name}, ${quantity}, 'ai', next_sort.value
           FROM next_sort
-          RETURNING id, user_id, name, quantity, liked, category, sort_order, checked, source, recipe_id, created_at::text
+          RETURNING id, user_id, family_id, name, quantity, liked, category, sort_order, checked, source, recipe_id, created_at::text
         `;
         inserted.push(row);
       }
@@ -138,10 +206,10 @@ export async function POST(req: Request) {
         FROM grocery_items
         WHERE user_id = ${userId}
       )
-      INSERT INTO grocery_items (user_id, name, quantity, source, sort_order)
-      SELECT ${userId}, ${name}, ${quantity}, 'manual', next_sort.value
+      INSERT INTO grocery_items (user_id, family_id, name, quantity, source, sort_order)
+      SELECT ${userId}, ${familyId}, ${name}, ${quantity}, 'manual', next_sort.value
       FROM next_sort
-      RETURNING id, user_id, name, quantity, liked, category, sort_order, checked, source, recipe_id, created_at::text
+      RETURNING id, user_id, family_id, name, quantity, liked, category, sort_order, checked, source, recipe_id, created_at::text
     `;
     return NextResponse.json(created, { status: 201 });
   } catch (error) {

@@ -2,6 +2,53 @@ import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { requireUserId } from "@/lib/route-auth";
 
+async function ensureGroceryScopeSchema() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS family_groups (
+      id          SERIAL PRIMARY KEY,
+      owner_id    INTEGER NOT NULL,
+      name        TEXT NOT NULL DEFAULT 'My Family',
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS family_memberships (
+      id          SERIAL PRIMARY KEY,
+      family_id   INTEGER NOT NULL REFERENCES family_groups(id) ON DELETE CASCADE,
+      user_id     INTEGER NOT NULL,
+      circle      TEXT NOT NULL CHECK (circle IN ('family', 'extended')),
+      role        TEXT NOT NULL DEFAULT 'member',
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(family_id, user_id)
+    )
+  `;
+  await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS family_id INTEGER`;
+}
+
+async function resolveGroceryFamilyId(userId: number): Promise<number> {
+  const [member] = await sql`
+    SELECT family_id
+    FROM family_memberships
+    WHERE user_id = ${userId}
+    ORDER BY (role = 'owner') ASC, created_at DESC
+    LIMIT 1
+  `;
+  if (member?.family_id) return Number(member.family_id);
+
+  const [createdFamily] = await sql`
+    INSERT INTO family_groups (owner_id, name)
+    VALUES (${userId}, 'My Family')
+    RETURNING id
+  `;
+  const familyId = Number(createdFamily.id);
+  await sql`
+    INSERT INTO family_memberships (family_id, user_id, circle, role)
+    VALUES (${familyId}, ${userId}, 'family', 'owner')
+    ON CONFLICT (family_id, user_id) DO NOTHING
+  `;
+  return familyId;
+}
+
 export async function PATCH(req: Request, context: { params: Promise<{ id: string }> }) {
   const authState = await requireUserId(req);
   if ("response" in authState) return authState.response;
@@ -14,6 +61,14 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   }
 
   try {
+    await ensureGroceryScopeSchema();
+    const familyId = await resolveGroceryFamilyId(userId);
+    await sql`
+      UPDATE grocery_items
+      SET family_id = ${familyId}
+      WHERE family_id IS NULL
+        AND user_id = ${userId}
+    `;
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
     const checked = typeof body.checked === "boolean" ? body.checked : null;
     const liked = typeof body.liked === "boolean" ? body.liked : null;
@@ -42,8 +97,8 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
         sort_order = COALESCE(${normalizedSortOrder}, sort_order),
         name = COALESCE(${name || null}, name),
         quantity = COALESCE(${quantity || null}, quantity)
-      WHERE id = ${itemId} AND user_id = ${userId}
-      RETURNING id, user_id, name, quantity, liked, category, sort_order, checked, source, recipe_id, created_at::text
+      WHERE id = ${itemId} AND family_id = ${familyId}
+      RETURNING id, user_id, family_id, name, quantity, liked, category, sort_order, checked, source, recipe_id, created_at::text
     `;
 
     if (!updated) {
@@ -67,9 +122,17 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
   }
 
   try {
+    await ensureGroceryScopeSchema();
+    const familyId = await resolveGroceryFamilyId(userId);
+    await sql`
+      UPDATE grocery_items
+      SET family_id = ${familyId}
+      WHERE family_id IS NULL
+        AND user_id = ${userId}
+    `;
     await sql`
       DELETE FROM grocery_items
-      WHERE id = ${itemId} AND user_id = ${userId}
+      WHERE id = ${itemId} AND family_id = ${familyId}
     `;
     return NextResponse.json({ ok: true });
   } catch (error) {
