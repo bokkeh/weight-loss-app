@@ -435,6 +435,8 @@ export default function FoodLogPage() {
   const [shareLabel, setShareLabel] = useState<"share" | "done">("share");
   const [goalsShareLabel, setGoalsShareLabel] = useState<"share" | "done">("share");
   const [mealIdeaIndex, setMealIdeaIndex] = useState(0);
+  const [mealIdeas, setMealIdeas] = useState<string[]>([]);
+  const [mealIdeasLoading, setMealIdeasLoading] = useState(false);
   const [quickAddingKey, setQuickAddingKey] = useState<string | null>(null);
   const [goals, setGoals] = useState<MacroGoals>(DEFAULT_MACRO_GOALS);
 
@@ -580,14 +582,60 @@ export default function FoodLogPage() {
   }
 
   const totals = sumMacros(entries);
-  const mealIdeas = buildMealIdeas(entries, recentEntries, goals);
-  const currentMealIdea = mealIdeas[Math.min(mealIdeaIndex, Math.max(0, mealIdeas.length - 1))] ?? "";
+  const fallbackMealIdeas = buildMealIdeas(entries, recentEntries, goals);
+  const displayedMealIdeas = mealIdeas.length > 0 ? mealIdeas : fallbackMealIdeas;
+  const currentMealIdea = displayedMealIdeas[Math.min(mealIdeaIndex, Math.max(0, displayedMealIdeas.length - 1))] ?? "";
   const frequentFoods = buildFrequentFoods(recentEntries);
   const isFirstMealExperience = recentEntries.length === 0;
 
   useEffect(() => {
     setMealIdeaIndex(0);
-  }, [selectedDate, mealIdeas.length]);
+  }, [selectedDate, displayedMealIdeas.length]);
+
+  useEffect(() => {
+    let canceled = false;
+
+    async function fetchAiMealIdeas() {
+      if (isFirstMealExperience) {
+        if (!canceled) setMealIdeas([]);
+        return;
+      }
+
+      setMealIdeasLoading(true);
+      try {
+        const res = await fetch("/api/food-log/meal-idea", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date: toDateStr(selectedDate),
+            current_hour: new Date().getHours(),
+            goals,
+          }),
+        });
+        const data = await readJsonSafe<{ ideas?: string[]; error?: string }>(res);
+        if (!res.ok) throw new Error(data?.error ?? "Failed to generate meal ideas.");
+        const nextIdeas = Array.isArray(data?.ideas)
+          ? data.ideas.map((v) => String(v).trim()).filter(Boolean).slice(0, 6)
+          : [];
+        if (!canceled) {
+          setMealIdeas(nextIdeas);
+        }
+      } catch {
+        if (!canceled) {
+          setMealIdeas([]);
+        }
+      } finally {
+        if (!canceled) {
+          setMealIdeasLoading(false);
+        }
+      }
+    }
+
+    fetchAiMealIdeas().catch(() => undefined);
+    return () => {
+      canceled = true;
+    };
+  }, [selectedDate, isFirstMealExperience, goals, entries, recentEntries]);
 
   return (
     <div className="space-y-6">
@@ -695,14 +743,14 @@ export default function FoodLogPage() {
           <Card className="mb-6">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Next Meal Idea</CardTitle>
-              {!loading && mealIdeas.length > 1 && (
+              {!loading && displayedMealIdeas.length > 1 && (
                 <div className="flex items-center gap-1">
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
                     className="h-7 w-7"
-                    onClick={() => setMealIdeaIndex((prev) => (prev - 1 + mealIdeas.length) % mealIdeas.length)}
+                    onClick={() => setMealIdeaIndex((prev) => (prev - 1 + displayedMealIdeas.length) % displayedMealIdeas.length)}
                     aria-label="Previous meal idea"
                   >
                     <ChevronLeft className="h-3.5 w-3.5" />
@@ -712,7 +760,7 @@ export default function FoodLogPage() {
                     variant="outline"
                     size="icon"
                     className="h-7 w-7"
-                    onClick={() => setMealIdeaIndex((prev) => (prev + 1) % mealIdeas.length)}
+                    onClick={() => setMealIdeaIndex((prev) => (prev + 1) % displayedMealIdeas.length)}
                     aria-label="Next meal idea"
                   >
                     <ChevronRight className="h-3.5 w-3.5" />
@@ -721,7 +769,7 @@ export default function FoodLogPage() {
               )}
             </CardHeader>
             <CardContent>
-              {loading ? (
+              {loading || mealIdeasLoading ? (
                 <Skeleton className="h-10 w-full" />
               ) : isFirstMealExperience ? (
                 <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground space-y-2">
@@ -731,9 +779,9 @@ export default function FoodLogPage() {
               ) : (
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground leading-relaxed">{currentMealIdea}</p>
-                  {mealIdeas.length > 1 && (
+                  {displayedMealIdeas.length > 1 && (
                     <p className="text-xs text-muted-foreground">
-                      Idea {Math.min(mealIdeaIndex + 1, mealIdeas.length)} of {mealIdeas.length}
+                      Idea {Math.min(mealIdeaIndex + 1, displayedMealIdeas.length)} of {displayedMealIdeas.length}
                     </p>
                   )}
                 </div>

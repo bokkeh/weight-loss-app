@@ -61,11 +61,28 @@ export interface VisionImageInput {
 export async function sendChatMessage(
   message: string,
   history: { role: string; content: string }[],
-  foodLogContext?: string
+  foodLogContext?: string,
+  images?: VisionImageInput[]
 ): Promise<string> {
   const systemContent = foodLogContext
     ? `${SYSTEM_PROMPT}\n\n${foodLogContext}`
     : SYSTEM_PROMPT;
+
+  const trimmedMessage = message.trim();
+  const hasImages = Array.isArray(images) && images.length > 0;
+
+  const userContent: OpenAI.Chat.ChatCompletionMessageParam["content"] = hasImages
+    ? [
+        ...(trimmedMessage ? ([{ type: "text", text: trimmedMessage }] as const) : []),
+        ...images.map((image) => ({
+          type: "image_url" as const,
+          image_url: {
+            url: `data:${image.mimeType};base64,${image.imageBase64}`,
+            detail: "low" as const,
+          },
+        })),
+      ]
+    : trimmedMessage;
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemContent },
@@ -73,11 +90,11 @@ export async function sendChatMessage(
       role: (m.role === "model" ? "assistant" : m.role) as "user" | "assistant",
       content: m.content,
     })),
-    { role: "user", content: message },
+    { role: "user", content: userContent },
   ];
 
   const response = await getClient().chat.completions.create({
-    model: "gpt-4o-mini",
+    model: hasImages ? "gpt-4o" : "gpt-4o-mini",
     messages,
   });
 

@@ -217,6 +217,19 @@ function byOrder(a: FoodLogEntry, b: FoodLogEntry) {
   return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
 }
 
+function formatEntryTimestamp(entry: FoodLogEntry): string {
+  const created = new Date(entry.created_at);
+  if (!Number.isNaN(created.getTime())) {
+    return `Logged ${created.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    })}`;
+  }
+  return `Logged ${entry.logged_at}`;
+}
+
 export function FoodLogTable({ entries, onDelete, onUpdated, onReordered }: Props) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draggingId, setDraggingId] = useState<number | null>(null);
@@ -388,6 +401,7 @@ export function FoodLogTable({ entries, onDelete, onUpdated, onReordered }: Prop
                           <span className="text-xs font-mono text-green-600">{Number(entry.fiber_g).toFixed(1)}g Fiber</span>
                         )}
                       </div>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">{formatEntryTimestamp(entry)}</p>
                     </div>
                   </div>
                   <Button

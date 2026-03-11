@@ -5,6 +5,7 @@ import {
   sendChatMessage,
   parseFoodLogBlock,
   stripFoodLogBlock,
+  type VisionImageInput,
 } from "@/lib/gemini";
 import { formatFoodName } from "@/lib/utils";
 
@@ -34,10 +35,23 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { message } = body as { message: string };
+    const {
+      message,
+      images,
+    } = body as {
+      message?: string;
+      images?: VisionImageInput[];
+    };
 
-    if (!message?.trim()) {
-      return NextResponse.json({ error: "message is required" }, { status: 400 });
+    const trimmedMessage = String(message ?? "").trim();
+    const safeImages = Array.isArray(images)
+      ? images
+          .filter((img) => img && typeof img.imageBase64 === "string" && typeof img.mimeType === "string")
+          .slice(0, 4)
+      : [];
+
+    if (!trimmedMessage && safeImages.length === 0) {
+      return NextResponse.json({ error: "message or image is required" }, { status: 400 });
     }
 
     // Load chat history for context
@@ -98,9 +112,10 @@ export async function POST(req: Request) {
     }
 
     const rawReply = await sendChatMessage(
-      message,
+      trimmedMessage,
       history as { role: string; content: string }[],
-      foodLogContext + weightContext
+      foodLogContext + weightContext,
+      safeImages
     );
 
     const foodPayload = parseFoodLogBlock(rawReply);
@@ -138,8 +153,10 @@ export async function POST(req: Request) {
       foodLogEntry = entry;
 
       // Save user message
+      const userContent =
+        trimmedMessage || (safeImages.length > 0 ? `[Image upload: ${safeImages.length} image(s)]` : "");
       await sql`
-        INSERT INTO chat_messages (user_id, role, content) VALUES (${userId}, 'user', ${message})
+        INSERT INTO chat_messages (user_id, role, content) VALUES (${userId}, 'user', ${userContent})
       `;
 
       // Save model response linked to food log
@@ -149,8 +166,10 @@ export async function POST(req: Request) {
       `;
     } else {
       // Save user message
+      const userContent =
+        trimmedMessage || (safeImages.length > 0 ? `[Image upload: ${safeImages.length} image(s)]` : "");
       await sql`
-        INSERT INTO chat_messages (user_id, role, content) VALUES (${userId}, 'user', ${message})
+        INSERT INTO chat_messages (user_id, role, content) VALUES (${userId}, 'user', ${userContent})
       `;
 
       // Save model response
