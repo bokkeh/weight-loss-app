@@ -1,6 +1,19 @@
 import { NextResponse } from "next/server";
+import OpenAI from "openai";
 import sql from "@/lib/db";
 import { requireUserId } from "@/lib/route-auth";
+
+let client: OpenAI | null = null;
+
+function getClient() {
+  if (!client) {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY is not set");
+    }
+    client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return client;
+}
 
 async function ensureGroceryImageSchema() {
   await sql`
@@ -56,7 +69,10 @@ function normalizeIngredientName(name: string): string {
     .toLowerCase()
     .replace(/\([^)]*\)/g, " ")
     .replace(/[^a-z0-9\s-]/g, " ")
-    .replace(/\b(fresh|large|small|extra|organic|raw|frozen|boneless|skinless|lean|low-fat|low sodium)\b/g, " ")
+    .replace(
+      /\b(fresh|large|small|extra|organic|raw|frozen|boneless|skinless|lean|low-fat|low sodium|diced|chopped|sliced|whole|ground)\b/g,
+      " "
+    )
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -66,6 +82,49 @@ function buildMealDbImageUrl(name: string): string | null {
   if (!normalized) return null;
   const ingredient = normalized.split(" ").slice(0, 3).join(" ");
   return `https://www.themealdb.com/images/ingredients/${encodeURIComponent(ingredient)}-small.png`;
+}
+
+async function normalizeIngredientQueries(names: string[]): Promise<Map<string, string>> {
+  const uniqueNames = [...new Set(names.map((name) => name.trim()).filter(Boolean))];
+  const fallback = new Map(uniqueNames.map((name) => [name, normalizeIngredientName(name)]));
+  if (uniqueNames.length === 0 || !process.env.OPENAI_API_KEY) {
+    return fallback;
+  }
+
+  try {
+    const response = await getClient().chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.1,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You map grocery item names to the best generic TheMealDB ingredient search term. Return only valid JSON with this shape: {\"items\":[{\"input\":\"string\",\"query\":\"string\"}]}. Rules: use a short common ingredient term, singular when appropriate, no brand names, no quantities, no adjectives unless essential, and map produce nicknames to the likely ingredient. Examples: cucumbers -> cucumber, whole wheat flour -> flour, cuties -> orange, scallions -> spring onion, ground beef -> beef, chicken breasts -> chicken.",
+        },
+        {
+          role: "user",
+          content: JSON.stringify({ items: uniqueNames }),
+        },
+      ],
+    });
+
+    const content = response.choices[0]?.message?.content?.trim() ?? "";
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return fallback;
+
+    const parsed = JSON.parse(jsonMatch[0]) as { items?: Array<{ input?: string; query?: string }> };
+    const mapped = new Map(fallback);
+    for (const item of parsed.items ?? []) {
+      const input = String(item.input ?? "").trim();
+      const query = normalizeIngredientName(String(item.query ?? ""));
+      if (input && query) {
+        mapped.set(input, query);
+      }
+    }
+    return mapped;
+  } catch {
+    return fallback;
+  }
 }
 
 export async function POST(req: Request) {
@@ -94,9 +153,15 @@ export async function POST(req: Request) {
       LIMIT ${limit}
     `;
 
+    const queryMap = await normalizeIngredientQueries(
+      candidates.map((row) => String(row.name ?? ""))
+    );
+
     const updated = [];
     for (const row of candidates) {
-      const imageUrl = buildMealDbImageUrl(String(row.name ?? ""));
+      const originalName = String(row.name ?? "").trim();
+      const normalizedQuery = queryMap.get(originalName) || normalizeIngredientName(originalName);
+      const imageUrl = normalizedQuery ? buildMealDbImageUrl(normalizedQuery) : null;
       const [saved] = await sql`
         UPDATE grocery_items
         SET
