@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,15 @@ const EDITABLE_CATEGORY_KEYS: GroceryGroupKey[] = [
   "misc",
 ];
 
+const ADDED_BY_BADGE_STYLES = [
+  "bg-rose-100 text-rose-800 border-rose-200",
+  "bg-sky-100 text-sky-800 border-sky-200",
+  "bg-amber-100 text-amber-800 border-amber-200",
+  "bg-emerald-100 text-emerald-800 border-emerald-200",
+  "bg-indigo-100 text-indigo-800 border-indigo-200",
+  "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200",
+];
+
 function inferGroup(name: string): GroceryGroupKey {
   const value = name.toLowerCase();
   if (/\b(apple|banana|berry|berries|orange|grape|melon|pear|peach|plum|pineapple|mango|avocado|fruit)\b/.test(value)) return "fruits";
@@ -59,6 +69,30 @@ function inferGroup(name: string): GroceryGroupKey {
   if (/\b(spice|spices|salt|pepper|paprika|cumin|garlic powder|onion powder|oregano|basil|sauce|ketchup|mustard|mayo|soy|hot sauce|salsa|vinaigrette)\b/.test(value)) return "spices_sauces";
   if (/\b(cookie|cookies|candy|chocolate|dessert|ice cream|brownie|cake|donut|doughnut|pastry|sweet)\b/.test(value)) return "sweets";
   return "misc";
+}
+
+function getAddedByLabel(item: GroceryItem): string {
+  return item.added_by_name || "Family member";
+}
+
+function getAddedByBadgeClass(item: GroceryItem): string {
+  const key = `${item.user_id ?? 0}:${getAddedByLabel(item)}`;
+  let hash = 0;
+  for (let i = 0; i < key.length; i += 1) {
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  }
+  return ADDED_BY_BADGE_STYLES[hash % ADDED_BY_BADGE_STYLES.length];
+}
+
+function AddedByBadge({ item }: { item: GroceryItem }) {
+  return (
+    <Badge
+      variant="outline"
+      className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${getAddedByBadgeClass(item)}`}
+    >
+      {getAddedByLabel(item)}
+    </Badge>
+  );
 }
 
 async function readJsonSafe<T>(res: Response): Promise<T | null> {
@@ -428,9 +462,9 @@ export default function GroceryPage() {
                         <div key={`fav-${fav.id}`} className="shrink-0 rounded-lg border px-3 py-2 min-w-56 bg-background">
                           <p className="text-sm font-medium truncate">{fav.name}</p>
                           <p className="text-xs text-muted-foreground">{fav.quantity || "No quantity"}</p>
-                          <p className="text-[11px] text-muted-foreground mt-1">
-                            Added by {fav.added_by_name || "a family member"}
-                          </p>
+                          <div className="mt-1">
+                            <AddedByBadge item={fav} />
+                          </div>
                           <Button
                             size="sm"
                             variant="outline"
@@ -576,10 +610,10 @@ export default function GroceryPage() {
                               </Button>
                             </div>
                           ) : (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                            <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
                               <span>{item.quantity || "No quantity"} | {item.source}</span>
                               <span>·</span>
-                              <span>Added by {item.added_by_name || "a family member"}</span>
+                              <AddedByBadge item={item} />
                               <button
                                 type="button"
                                 onClick={() => startEditQuantity(item)}
@@ -588,7 +622,7 @@ export default function GroceryPage() {
                               >
                                 <Pencil className="h-3.5 w-3.5" />
                               </button>
-                            </p>
+                            </div>
                           )}
                         </div>
                         <button
