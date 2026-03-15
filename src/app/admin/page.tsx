@@ -158,8 +158,8 @@ export default async function AdminPage() {
         user_id,
         MAX(logged_in_at) AS last_login_at,
         COUNT(*) FILTER (
-          WHERE (logged_in_at AT TIME ZONE ${ADMIN_TIME_ZONE})::date =
-                (NOW() AT TIME ZONE ${ADMIN_TIME_ZONE})::date
+          WHERE (logged_in_at AT TIME ZONE 'America/Chicago')::date =
+                (NOW() AT TIME ZONE 'America/Chicago')::date
         )::int AS logins_today,
         MAX(email) FILTER (WHERE email IS NOT NULL AND TRIM(email) <> '') AS last_login_email
       FROM auth_login_events
@@ -254,12 +254,12 @@ export default async function AdminPage() {
 
   const daily = (await sql`
     SELECT
-      ((logged_in_at AT TIME ZONE ${ADMIN_TIME_ZONE})::date)::text AS day,
+      ((logged_in_at AT TIME ZONE 'America/Chicago')::date)::text AS day,
       COUNT(*)::int AS login_count
     FROM auth_login_events
-    WHERE (logged_in_at AT TIME ZONE ${ADMIN_TIME_ZONE})::date >=
-          ((NOW() AT TIME ZONE ${ADMIN_TIME_ZONE})::date - 13)
-    GROUP BY (logged_in_at AT TIME ZONE ${ADMIN_TIME_ZONE})::date
+    WHERE (logged_in_at AT TIME ZONE 'America/Chicago')::date >=
+          ((NOW() AT TIME ZONE 'America/Chicago')::date - 13)
+    GROUP BY (logged_in_at AT TIME ZONE 'America/Chicago')::date
     ORDER BY day DESC
   `) as DailyRow[];
 
@@ -304,15 +304,15 @@ export default async function AdminPage() {
         SELECT COUNT(*)::int
         FROM auth_signin_events
         WHERE event_type = 'page_view'
-          AND (created_at AT TIME ZONE ${ADMIN_TIME_ZONE})::date >=
-              ((NOW() AT TIME ZONE ${ADMIN_TIME_ZONE})::date - 13)
+          AND (created_at AT TIME ZONE 'America/Chicago')::date >=
+              ((NOW() AT TIME ZONE 'America/Chicago')::date - 13)
       ) AS signin_page_views_14d,
       (
         SELECT COUNT(*)::int
         FROM auth_signin_events
         WHERE event_type = 'oauth_click'
-          AND (created_at AT TIME ZONE ${ADMIN_TIME_ZONE})::date >=
-              ((NOW() AT TIME ZONE ${ADMIN_TIME_ZONE})::date - 13)
+          AND (created_at AT TIME ZONE 'America/Chicago')::date >=
+              ((NOW() AT TIME ZONE 'America/Chicago')::date - 13)
       ) AS oauth_clicks_14d,
       (SELECT COUNT(*)::int FROM feature_requests) AS feature_requests,
       (SELECT COUNT(*) FROM weight_entries)::int AS weight_entries,
@@ -343,13 +343,13 @@ export default async function AdminPage() {
 
   const signinTraffic = (await sql`
     SELECT
-      ((created_at AT TIME ZONE ${ADMIN_TIME_ZONE})::date)::text AS day,
+      ((created_at AT TIME ZONE 'America/Chicago')::date)::text AS day,
       COUNT(*) FILTER (WHERE event_type = 'page_view')::int AS page_views,
       COUNT(*) FILTER (WHERE event_type = 'oauth_click')::int AS oauth_clicks
     FROM auth_signin_events
-    WHERE (created_at AT TIME ZONE ${ADMIN_TIME_ZONE})::date >=
-          ((NOW() AT TIME ZONE ${ADMIN_TIME_ZONE})::date - 13)
-    GROUP BY (created_at AT TIME ZONE ${ADMIN_TIME_ZONE})::date
+    WHERE (created_at AT TIME ZONE 'America/Chicago')::date >=
+          ((NOW() AT TIME ZONE 'America/Chicago')::date - 13)
+    GROUP BY (created_at AT TIME ZONE 'America/Chicago')::date
     ORDER BY day DESC
   `) as Array<{ day: string; page_views: number; oauth_clicks: number }>;
 
