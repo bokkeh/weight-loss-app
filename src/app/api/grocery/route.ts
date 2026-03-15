@@ -140,7 +140,39 @@ export async function GET(req: Request) {
       WHERE grocery_items.family_id = ${familyId}
       ORDER BY checked ASC, sort_order ASC, created_at DESC
     `;
-    return NextResponse.json(items);
+    const participants = await sql`
+      SELECT
+        family_memberships.user_id,
+        family_memberships.circle,
+        family_memberships.role,
+        NULLIF(
+          TRIM(
+            CONCAT(
+              COALESCE(user_profiles.first_name, ''),
+              ' ',
+              COALESCE(user_profiles.last_name, '')
+            )
+          ),
+          ''
+        ) AS name,
+        user_profiles.email,
+        user_profiles.profile_image_url
+      FROM family_memberships
+      LEFT JOIN user_profiles ON user_profiles.id = family_memberships.user_id
+      WHERE family_memberships.family_id = ${familyId}
+      ORDER BY (family_memberships.role = 'owner') DESC, family_memberships.created_at ASC
+    `;
+    const [family] = await sql`
+      SELECT id, name
+      FROM family_groups
+      WHERE id = ${familyId}
+      LIMIT 1
+    `;
+    return NextResponse.json({
+      items,
+      participants,
+      family: family ?? { id: familyId, name: "My Family" },
+    });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }

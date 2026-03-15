@@ -27,6 +27,24 @@ interface GroceryItem {
   added_by_name?: string | null;
 }
 
+interface GroceryParticipant {
+  user_id: number;
+  circle: "family" | "extended";
+  role: string;
+  name?: string | null;
+  email?: string | null;
+  profile_image_url?: string | null;
+}
+
+interface GroceryResponse {
+  items: GroceryItem[];
+  participants: GroceryParticipant[];
+  family?: {
+    id: number;
+    name: string;
+  } | null;
+}
+
 type GroceryGroupKey = "liked" | "fruits" | "veggies" | "breads" | "meats" | "dairy" | "spices_sauces" | "sweets" | "misc";
 
 const GROUP_LABELS: Record<GroceryGroupKey, string> = {
@@ -61,6 +79,18 @@ const ADDED_BY_BADGE_STYLES = [
   "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200",
 ];
 
+const CATEGORY_BADGE_STYLES: Record<GroceryGroupKey, string> = {
+  liked: "bg-amber-100 text-amber-900 border-amber-300",
+  fruits: "bg-rose-100 text-rose-900 border-rose-300",
+  veggies: "bg-emerald-100 text-emerald-900 border-emerald-300",
+  breads: "bg-orange-100 text-orange-900 border-orange-300",
+  meats: "bg-red-100 text-red-900 border-red-300",
+  dairy: "bg-sky-100 text-sky-900 border-sky-300",
+  spices_sauces: "bg-violet-100 text-violet-900 border-violet-300",
+  sweets: "bg-pink-100 text-pink-900 border-pink-300",
+  misc: "bg-slate-100 text-slate-900 border-slate-300",
+};
+
 function inferGroup(name: string): GroceryGroupKey {
   const value = name.toLowerCase();
   if (/\b(apple|banana|berry|berries|orange|grape|melon|pear|peach|plum|pineapple|mango|avocado|fruit)\b/.test(value)) return "fruits";
@@ -93,6 +123,22 @@ function AddedByBadge({ item }: { item: GroceryItem }) {
       className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${getAddedByBadgeClass(item)}`}
     >
       {getAddedByLabel(item)}
+    </Badge>
+  );
+}
+
+function getItemCategory(item: GroceryItem): GroceryGroupKey {
+  if (item.liked) return "liked";
+  return item.category ?? inferGroup(item.name);
+}
+
+function CategoryBadge({ category }: { category: GroceryGroupKey }) {
+  return (
+    <Badge
+      variant="outline"
+      className={`rounded-full px-3 py-1 text-xs font-semibold ${CATEGORY_BADGE_STYLES[category]}`}
+    >
+      {GROUP_LABELS[category]}
     </Badge>
   );
 }
@@ -181,6 +227,8 @@ async function buildChecklistImage(items: GroceryItem[]): Promise<File> {
 
 export default function GroceryPage() {
   const [items, setItems] = useState<GroceryItem[]>([]);
+  const [participants, setParticipants] = useState<GroceryParticipant[]>([]);
+  const [familyName, setFamilyName] = useState("My Family");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -199,8 +247,16 @@ export default function GroceryPage() {
     setLoading(true);
     try {
       const res = await fetch("/api/grocery");
-      const data = await readJsonSafe<GroceryItem[]>(res);
-      setItems(res.ok && Array.isArray(data) ? data : []);
+      const data = await readJsonSafe<GroceryResponse | GroceryItem[]>(res);
+      if (res.ok && data && !Array.isArray(data)) {
+        setItems(Array.isArray(data.items) ? data.items : []);
+        setParticipants(Array.isArray(data.participants) ? data.participants : []);
+        setFamilyName(data.family?.name || "My Family");
+      } else {
+        setItems(res.ok && Array.isArray(data) ? data : []);
+        setParticipants([]);
+        setFamilyName("My Family");
+      }
     } finally {
       setLoading(false);
     }
@@ -460,6 +516,16 @@ export default function GroceryPage() {
     return groups;
   }, [items]);
 
+  function getParticipantLabel(participant: GroceryParticipant): string {
+    return participant.name?.trim() || participant.email || `User ${participant.user_id}`;
+  }
+
+  function getParticipantInitials(participant: GroceryParticipant): string {
+    const label = getParticipantLabel(participant);
+    const parts = label.split(/\s+/).filter(Boolean);
+    return parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("") || "?";
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-3">
@@ -474,6 +540,52 @@ export default function GroceryPage() {
           {shareDone ? "Shared" : "Share"}
         </Button>
       </div>
+
+      {participants.length > 0 && (
+        <Card className="border-emerald-200 bg-gradient-to-r from-emerald-50 to-sky-50">
+          <CardContent className="pt-6">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  Shared with {familyName}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  These family space participants are connected to this grocery list.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {participants.map((participant) => (
+                  <div
+                    key={participant.user_id}
+                    className="flex items-center gap-2 rounded-full border bg-white/90 px-2.5 py-1.5 shadow-sm"
+                  >
+                    {participant.profile_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={participant.profile_image_url}
+                        alt={getParticipantLabel(participant)}
+                        className="h-7 w-7 rounded-full object-cover border"
+                      />
+                    ) : (
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-[11px] font-semibold text-slate-700">
+                        {getParticipantInitials(participant)}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-medium text-slate-900">
+                        {getParticipantLabel(participant)}
+                      </span>
+                      <Badge variant="outline" className="text-[10px] capitalize">
+                        {participant.role === "owner" ? "owner" : participant.circle}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="pb-2">
@@ -526,6 +638,9 @@ export default function GroceryPage() {
                       {groupedItems.liked.map((fav) => (
                         <div key={`fav-${fav.id}`} className="shrink-0 rounded-lg border px-3 py-2 min-w-56 bg-background">
                           <p className="text-sm font-medium truncate">{fav.name}</p>
+                          <div className="mt-1">
+                            <CategoryBadge category={getItemCategory(fav)} />
+                          </div>
                           <p className="text-xs text-muted-foreground">{fav.quantity || "No quantity"}</p>
                           <div className="mt-1">
                             <AddedByBadge item={fav} />
@@ -677,6 +792,7 @@ export default function GroceryPage() {
                             </div>
                           ) : (
                             <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                              <CategoryBadge category={getItemCategory(item)} />
                               <span>{item.quantity || "No quantity"} | {item.source}</span>
                               <span>·</span>
                               <AddedByBadge item={item} />
