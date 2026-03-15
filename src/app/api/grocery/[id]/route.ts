@@ -14,6 +14,8 @@ const GROCERY_ITEM_SELECT = sql`
   grocery_items.checked,
   grocery_items.source,
   grocery_items.recipe_id,
+  grocery_items.image_url,
+  grocery_items.image_lookup_attempted_at::text,
   grocery_items.created_at::text,
   NULLIF(
     TRIM(
@@ -48,6 +50,8 @@ async function ensureGroceryScopeSchema() {
     )
   `;
   await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS family_id INTEGER`;
+  await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS image_url TEXT`;
+  await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS image_lookup_attempted_at TIMESTAMPTZ`;
 }
 
 async function resolveGroceryFamilyId(userId: number): Promise<number> {

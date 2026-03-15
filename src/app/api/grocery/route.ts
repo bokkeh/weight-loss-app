@@ -14,6 +14,8 @@ const GROCERY_ITEM_SELECT = sql`
   grocery_items.checked,
   grocery_items.source,
   grocery_items.recipe_id,
+  grocery_items.image_url,
+  grocery_items.image_lookup_attempted_at::text,
   grocery_items.created_at::text,
   NULLIF(
     TRIM(
@@ -72,6 +74,8 @@ async function ensureGroceryTable() {
       checked     BOOLEAN NOT NULL DEFAULT FALSE,
       source      TEXT NOT NULL DEFAULT 'manual',
       recipe_id   INTEGER,
+      image_url   TEXT,
+      image_lookup_attempted_at TIMESTAMPTZ,
       created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
@@ -79,6 +83,8 @@ async function ensureGroceryTable() {
   await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS category TEXT`;
   await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0`;
   await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS family_id INTEGER`;
+  await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS image_url TEXT`;
+  await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS image_lookup_attempted_at TIMESTAMPTZ`;
   await sql`
     CREATE INDEX IF NOT EXISTS idx_grocery_items_user_checked_created
       ON grocery_items (user_id, checked, created_at DESC)

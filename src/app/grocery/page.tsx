@@ -21,6 +21,8 @@ interface GroceryItem {
   checked: boolean;
   source: string;
   recipe_id?: number | null;
+  image_url?: string | null;
+  image_lookup_attempted_at?: string | null;
   created_at: string;
   added_by_name?: string | null;
 }
@@ -92,6 +94,25 @@ function AddedByBadge({ item }: { item: GroceryItem }) {
     >
       {getAddedByLabel(item)}
     </Badge>
+  );
+}
+
+function GroceryThumb({ item }: { item: GroceryItem }) {
+  if (item.image_url) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={item.image_url}
+        alt={item.name}
+        className="h-12 w-12 rounded-lg border object-cover bg-muted shrink-0"
+      />
+    );
+  }
+
+  return (
+    <div className="h-12 w-12 rounded-lg border bg-gradient-to-br from-emerald-50 to-sky-50 text-slate-600 shrink-0 flex items-center justify-center text-sm font-semibold">
+      {item.name.trim().charAt(0).toUpperCase() || "?"}
+    </div>
   );
 }
 
@@ -184,6 +205,46 @@ export default function GroceryPage() {
   useEffect(() => {
     fetchItems().catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (items.length === 0) return;
+    if (!items.some((item) => !item.image_url && !item.image_lookup_attempted_at && !item.checked)) return;
+
+    let cancelled = false;
+
+    async function hydrateImages() {
+      try {
+        const res = await fetch("/api/grocery/images/refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ limit: 6 }),
+        });
+        const data = await readJsonSafe<{ updated?: Array<{ id: number; image_url?: string | null; image_lookup_attempted_at?: string | null }> }>(res);
+        if (!res.ok || cancelled || !Array.isArray(data?.updated) || data.updated.length === 0) return;
+
+        setItems((prev) =>
+          prev.map((item) => {
+            const match = data.updated?.find((candidate) => candidate.id === item.id);
+            return match
+              ? {
+                  ...item,
+                  image_url: match.image_url ?? null,
+                  image_lookup_attempted_at: match.image_lookup_attempted_at ?? null,
+                }
+              : item;
+          })
+        );
+      } catch {
+        // Ignore image lookup failures and keep the placeholder square.
+      }
+    }
+
+    hydrateImages().catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
 
   async function addManualItem() {
     const name = manualName.trim();
@@ -563,6 +624,7 @@ export default function GroceryPage() {
                             <Circle className="h-5 w-5 text-slate-500" />
                           )}
                         </button>
+                        <GroceryThumb item={item} />
                         <div className="flex-1 min-w-0">
                           <p className={`font-medium ${item.checked ? "line-through text-muted-foreground" : ""}`}>
                             {item.name}
