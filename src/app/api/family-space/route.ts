@@ -2,128 +2,14 @@ import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { requireUserId } from "@/lib/route-auth";
 import { findUserIdByEmail } from "@/lib/auth-user";
-
-type Circle = "family" | "extended";
-
-async function ensureFamilySchema() {
-  await sql`
-    CREATE TABLE IF NOT EXISTS family_groups (
-      id          SERIAL PRIMARY KEY,
-      owner_id    INTEGER NOT NULL,
-      name        TEXT NOT NULL DEFAULT 'My Family',
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
-
-  await sql`
-    CREATE TABLE IF NOT EXISTS family_memberships (
-      id          SERIAL PRIMARY KEY,
-      family_id   INTEGER NOT NULL REFERENCES family_groups(id) ON DELETE CASCADE,
-      user_id     INTEGER NOT NULL,
-      circle      TEXT NOT NULL CHECK (circle IN ('family', 'extended')),
-      role        TEXT NOT NULL DEFAULT 'member',
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE(family_id, user_id)
-    )
-  `;
-
-  await sql`
-    CREATE TABLE IF NOT EXISTS family_invites (
-      id           SERIAL PRIMARY KEY,
-      family_id    INTEGER NOT NULL REFERENCES family_groups(id) ON DELETE CASCADE,
-      email        TEXT NOT NULL,
-      circle       TEXT NOT NULL CHECK (circle IN ('family', 'extended')),
-      status       TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
-      invited_by   INTEGER NOT NULL,
-      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      accepted_at  TIMESTAMPTZ
-    )
-  `;
-
-  await sql`
-    CREATE TABLE IF NOT EXISTS family_shared_grocery_items (
-      id          SERIAL PRIMARY KEY,
-      family_id   INTEGER NOT NULL REFERENCES family_groups(id) ON DELETE CASCADE,
-      name        TEXT NOT NULL,
-      quantity    TEXT,
-      checked     BOOLEAN NOT NULL DEFAULT FALSE,
-      created_by  INTEGER NOT NULL,
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
-
-  await sql`
-    CREATE TABLE IF NOT EXISTS family_kid_naps (
-      id          SERIAL PRIMARY KEY,
-      family_id   INTEGER NOT NULL REFERENCES family_groups(id) ON DELETE CASCADE,
-      kid_name    TEXT NOT NULL,
-      nap_date    DATE NOT NULL DEFAULT CURRENT_DATE,
-      start_time  TEXT,
-      end_time    TEXT,
-      notes       TEXT,
-      created_by  INTEGER NOT NULL,
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
-
-  await sql`
-    CREATE TABLE IF NOT EXISTS family_partner_cycles (
-      id                  SERIAL PRIMARY KEY,
-      family_id           INTEGER NOT NULL REFERENCES family_groups(id) ON DELETE CASCADE,
-      partner_name        TEXT,
-      cycle_start_date    DATE NOT NULL,
-      cycle_length_days   INTEGER NOT NULL DEFAULT 28,
-      period_length_days  INTEGER NOT NULL DEFAULT 5,
-      notes               TEXT,
-      created_by          INTEGER NOT NULL,
-      created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
-}
-
-async function getPrimaryFamilyId(userId: number): Promise<number> {
-  const [owned] = await sql`
-    SELECT id
-    FROM family_groups
-    WHERE owner_id = ${userId}
-    ORDER BY id ASC
-    LIMIT 1
-  `;
-  if (owned?.id) return Number(owned.id);
-
-  const [member] = await sql`
-    SELECT family_id
-    FROM family_memberships
-    WHERE user_id = ${userId}
-    ORDER BY id ASC
-    LIMIT 1
-  `;
-  if (member?.family_id) return Number(member.family_id);
-
-  const [created] = await sql`
-    INSERT INTO family_groups (owner_id, name)
-    VALUES (${userId}, 'My Family')
-    RETURNING id
-  `;
-  const familyId = Number(created.id);
-  await sql`
-    INSERT INTO family_memberships (family_id, user_id, circle, role)
-    VALUES (${familyId}, ${userId}, 'family', 'owner')
-    ON CONFLICT (family_id, user_id) DO NOTHING
-  `;
-  return familyId;
-}
-
-async function isMember(userId: number, familyId: number): Promise<boolean> {
-  const [row] = await sql`
-    SELECT id
-    FROM family_memberships
-    WHERE family_id = ${familyId}
-      AND user_id = ${userId}
-    LIMIT 1
-  `;
-  return Boolean(row?.id);
-}
+import {
+  ensureFamilySchema,
+  getPrimaryFamilyId,
+  getUserEmail,
+  isFamilyMember,
+  listPendingFamilyInvites,
+  type Circle,
+} from "@/lib/family-space";
 
 function normalizeCircle(value: unknown): Circle {
   return String(value) === "extended" ? "extended" : "family";
@@ -202,6 +88,7 @@ export async function GET(req: Request) {
       family,
       members,
       invites,
+      pending_invites: await listPendingFamilyInvites(userId),
       grocery,
       naps,
       cycle: cycle ?? null,
@@ -219,7 +106,7 @@ export async function POST(req: Request) {
   try {
     await ensureFamilySchema();
     const familyId = await getPrimaryFamilyId(userId);
-    if (!(await isMember(userId, familyId))) {
+    if (!(await isFamilyMember(userId, familyId))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -230,26 +117,124 @@ export async function POST(req: Request) {
       const email = String(body.email ?? "").trim().toLowerCase();
       if (!email) return NextResponse.json({ error: "Email is required." }, { status: 400 });
       const circle = normalizeCircle(body.circle);
-      const invitedUserId = await findUserIdByEmail(email);
-
-      if (invitedUserId) {
-        await sql`
-          INSERT INTO family_memberships (family_id, user_id, circle, role)
-          VALUES (${familyId}, ${invitedUserId}, ${circle}, 'member')
-          ON CONFLICT (family_id, user_id)
-          DO UPDATE SET circle = EXCLUDED.circle
-        `;
-        await sql`
-          INSERT INTO family_invites (family_id, email, circle, status, invited_by, accepted_at)
-          VALUES (${familyId}, ${email}, ${circle}, 'accepted', ${userId}, NOW())
-        `;
-      } else {
-        await sql`
-          INSERT INTO family_invites (family_id, email, circle, status, invited_by)
-          VALUES (${familyId}, ${email}, ${circle}, 'pending', ${userId})
-        `;
+      const currentUserEmail = await getUserEmail(userId);
+      if (currentUserEmail && email === currentUserEmail) {
+        return NextResponse.json({ error: "You cannot invite your own account." }, { status: 400 });
       }
-      return NextResponse.json({ ok: true });
+
+      const invitedUserId = await findUserIdByEmail(email);
+      if (invitedUserId && (await isFamilyMember(invitedUserId, familyId))) {
+        return NextResponse.json({ ok: true, message: "That account is already in this family space." });
+      }
+
+      const [existingPending] = await sql`
+        SELECT id
+        FROM family_invites
+        WHERE family_id = ${familyId}
+          AND LOWER(email) = LOWER(${email})
+          AND status = 'pending'
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      if (existingPending?.id) {
+        return NextResponse.json({ ok: true, message: "An invite is already pending for that email." });
+      }
+
+      await sql`
+        INSERT INTO family_invites (family_id, email, circle, status, invited_by)
+        VALUES (${familyId}, ${email}, ${circle}, 'pending', ${userId})
+      `;
+
+      return NextResponse.json({
+        ok: true,
+        message: invitedUserId
+          ? "Invite sent. They can accept it from their Family Space notifications."
+          : "Invite saved. Once that account signs up with this email, it can accept the invite from Family Space.",
+      });
+    }
+
+    if (action === "accept_invite") {
+      const inviteId = Number(body.invite_id);
+      if (!Number.isFinite(inviteId) || inviteId <= 0) {
+        return NextResponse.json({ error: "Invite id is required." }, { status: 400 });
+      }
+
+      const currentUserEmail = await getUserEmail(userId);
+      if (!currentUserEmail) {
+        return NextResponse.json(
+          { error: "Your account needs an email before it can accept family invites." },
+          { status: 400 }
+        );
+      }
+
+      const [invite] = await sql`
+        SELECT id, family_id, circle
+        FROM family_invites
+        WHERE id = ${inviteId}
+          AND LOWER(email) = LOWER(${currentUserEmail})
+          AND status = 'pending'
+        LIMIT 1
+      `;
+      if (!invite?.id) {
+        return NextResponse.json({ error: "Invite not found." }, { status: 404 });
+      }
+
+      await sql`
+        INSERT INTO family_memberships (family_id, user_id, circle, role)
+        VALUES (${invite.family_id}, ${userId}, ${invite.circle}, 'member')
+        ON CONFLICT (family_id, user_id)
+        DO UPDATE SET circle = EXCLUDED.circle
+      `;
+      await sql`
+        UPDATE family_invites
+        SET status = 'accepted', accepted_at = NOW()
+        WHERE id = ${inviteId}
+      `;
+      await sql`
+        UPDATE grocery_items
+        SET family_id = ${invite.family_id}
+        WHERE user_id = ${userId}
+          AND family_id IS DISTINCT FROM ${invite.family_id}
+      `;
+
+      return NextResponse.json({
+        ok: true,
+        message: "Invite accepted. You now have access to the shared family grocery list.",
+      });
+    }
+
+    if (action === "decline_invite") {
+      const inviteId = Number(body.invite_id);
+      if (!Number.isFinite(inviteId) || inviteId <= 0) {
+        return NextResponse.json({ error: "Invite id is required." }, { status: 400 });
+      }
+
+      const currentUserEmail = await getUserEmail(userId);
+      if (!currentUserEmail) {
+        return NextResponse.json(
+          { error: "Your account needs an email before it can manage family invites." },
+          { status: 400 }
+        );
+      }
+
+      const [invite] = await sql`
+        SELECT id
+        FROM family_invites
+        WHERE id = ${inviteId}
+          AND LOWER(email) = LOWER(${currentUserEmail})
+          AND status = 'pending'
+        LIMIT 1
+      `;
+      if (!invite?.id) {
+        return NextResponse.json({ error: "Invite not found." }, { status: 404 });
+      }
+
+      await sql`
+        UPDATE family_invites
+        SET status = 'declined'
+        WHERE id = ${inviteId}
+      `;
+      return NextResponse.json({ ok: true, message: "Invite declined." });
     }
 
     if (action === "add_grocery") {

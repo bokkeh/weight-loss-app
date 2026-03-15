@@ -58,6 +58,7 @@ export interface UserProfile {
   email?: string;
   phone?: string;
   profile_image_url?: string;
+  account_type?: "regular" | "personal_trainer" | "admin";
   dietary_restrictions?: string[];
   calorie_goal?: number;
   protein_goal_g?: number;

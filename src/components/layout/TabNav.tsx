@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
@@ -60,9 +60,42 @@ export function TabNav() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [familyNotificationCount, setFamilyNotificationCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!session?.user) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    async function loadFamilyNotifications() {
+      try {
+        const res = await fetch("/api/family-space/notifications");
+        const data = (await res.json().catch(() => null)) as { count?: number } | null;
+        if (!cancelled) {
+          setFamilyNotificationCount(res.ok && data?.count ? data.count : 0);
+        }
+      } catch {
+        if (!cancelled) {
+          setFamilyNotificationCount(0);
+        }
+      }
+    }
+
+    loadFamilyNotifications().catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user]);
+
   if (pathname.startsWith("/signin")) {
     return null;
   }
+
   const closeMenu = () => setMenuOpen(false);
   const isAdmin = session?.user?.email?.toLowerCase() === "alexterry12@gmail.com";
 
@@ -114,6 +147,21 @@ export function TabNav() {
     ? [...tabs, activityTab, familySpaceTab, featureRequestTab, myDataTab, profileTab, { href: "/admin", label: "Admin", icon: Shield }]
     : [...tabs, activityTab, familySpaceTab, featureRequestTab, myDataTab, profileTab];
 
+  function renderLabel(label: string, href: string) {
+    if (href !== "/family-space" || familyNotificationCount <= 0) {
+      return label;
+    }
+
+    return (
+      <span className="flex items-center gap-2">
+        <span>{label}</span>
+        <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+          {familyNotificationCount > 9 ? "9+" : familyNotificationCount}
+        </span>
+      </span>
+    );
+  }
+
   return (
     <>
       {/* Desktop: left sidebar */}
@@ -136,7 +184,7 @@ export function TabNav() {
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" />
-                {label}
+                {renderLabel(label, href)}
               </Link>
             );
           })}
@@ -187,7 +235,7 @@ export function TabNav() {
                       )}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
-                      {label}
+                      {renderLabel(label, href)}
                     </Link>
                   );
                 })}

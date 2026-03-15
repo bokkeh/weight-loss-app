@@ -12,6 +12,7 @@ async function ensureProfileTable() {
         email                 TEXT,
         phone                 TEXT,
         profile_image_url     TEXT,
+        account_type          TEXT NOT NULL DEFAULT 'regular',
         dietary_restrictions  TEXT[],
         calorie_goal          NUMERIC,
         protein_goal_g        NUMERIC,
@@ -27,6 +28,7 @@ async function ensureProfileTable() {
       )
     `;
     await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS calorie_goal NUMERIC`;
+    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'regular'`;
     await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS protein_goal_g NUMERIC`;
     await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS carbs_goal_g NUMERIC`;
     await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fat_goal_g NUMERIC`;
@@ -55,7 +57,7 @@ export async function GET(req: Request) {
     await ensureProfileTable();
     const [profile] = await sql`
       SELECT
-        id, first_name, last_name, email, phone, profile_image_url, dietary_restrictions,
+        id, first_name, last_name, email, phone, profile_image_url, account_type, dietary_restrictions,
         calorie_goal::float, protein_goal_g::float, carbs_goal_g::float, fat_goal_g::float,
         fiber_goal_g::float, sodium_goal_mg::float, height_in::float, goal_weight_lbs::float,
         onboarding_completed,
@@ -70,7 +72,7 @@ export async function GET(req: Request) {
       INSERT INTO user_profiles (id)
       VALUES (${userId})
       RETURNING
-        id, first_name, last_name, email, phone, profile_image_url, dietary_restrictions,
+        id, first_name, last_name, email, phone, profile_image_url, account_type, dietary_restrictions,
         calorie_goal::float, protein_goal_g::float, carbs_goal_g::float, fat_goal_g::float,
         fiber_goal_g::float, sodium_goal_mg::float, height_in::float, goal_weight_lbs::float,
         onboarding_completed,
@@ -97,6 +99,7 @@ export async function PUT(req: Request) {
       phone,
       dietary_restrictions,
       profile_image_url,
+      account_type,
       calorie_goal,
       protein_goal_g,
       carbs_goal_g,
@@ -112,9 +115,14 @@ export async function PUT(req: Request) {
       ? dietary_restrictions.map((v) => String(v).trim()).filter(Boolean)
       : null;
 
+    const normalizedAccountType =
+      account_type === "personal_trainer" || account_type === "admin" || account_type === "regular"
+        ? account_type
+        : null;
+
     const [profile] = await sql`
       INSERT INTO user_profiles (
-        id, first_name, last_name, email, phone, dietary_restrictions, profile_image_url,
+        id, first_name, last_name, email, phone, dietary_restrictions, profile_image_url, account_type,
         calorie_goal, protein_goal_g, carbs_goal_g, fat_goal_g, fiber_goal_g, sodium_goal_mg,
         height_in, goal_weight_lbs, onboarding_completed
       )
@@ -126,6 +134,7 @@ export async function PUT(req: Request) {
         ${phone ? String(phone).trim() : null},
         ${restrictions},
         ${profile_image_url ? String(profile_image_url).trim() : null},
+        ${normalizedAccountType ?? "regular"},
         ${parseNumeric(calorie_goal)},
         ${parseNumeric(protein_goal_g)},
         ${parseNumeric(carbs_goal_g)},
@@ -143,6 +152,7 @@ export async function PUT(req: Request) {
         phone = COALESCE(${phone ? String(phone).trim() : null}, user_profiles.phone),
         dietary_restrictions = COALESCE(${restrictions}, user_profiles.dietary_restrictions),
         profile_image_url = COALESCE(${profile_image_url ? String(profile_image_url).trim() : null}, user_profiles.profile_image_url),
+        account_type = COALESCE(${normalizedAccountType}, user_profiles.account_type),
         calorie_goal = COALESCE(${parseNumeric(calorie_goal)}, user_profiles.calorie_goal),
         protein_goal_g = COALESCE(${parseNumeric(protein_goal_g)}, user_profiles.protein_goal_g),
         carbs_goal_g = COALESCE(${parseNumeric(carbs_goal_g)}, user_profiles.carbs_goal_g),
@@ -156,7 +166,7 @@ export async function PUT(req: Request) {
           user_profiles.onboarding_completed
         )
       RETURNING
-        id, first_name, last_name, email, phone, profile_image_url, dietary_restrictions,
+        id, first_name, last_name, email, phone, profile_image_url, account_type, dietary_restrictions,
         calorie_goal::float, protein_goal_g::float, carbs_goal_g::float, fat_goal_g::float,
         fiber_goal_g::float, sodium_goal_mg::float, height_in::float, goal_weight_lbs::float,
         onboarding_completed,

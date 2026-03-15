@@ -5,9 +5,30 @@ import { requireUserId } from "@/lib/route-auth";
 async function ensureRecipesTable() {
   try {
     await sql`
+      CREATE TABLE IF NOT EXISTS family_groups (
+        id          SERIAL PRIMARY KEY,
+        owner_id    INTEGER NOT NULL,
+        name        TEXT NOT NULL DEFAULT 'My Family',
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS family_memberships (
+        id          SERIAL PRIMARY KEY,
+        family_id   INTEGER NOT NULL REFERENCES family_groups(id) ON DELETE CASCADE,
+        user_id     INTEGER NOT NULL,
+        circle      TEXT NOT NULL CHECK (circle IN ('family', 'extended')),
+        role        TEXT NOT NULL DEFAULT 'member',
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(family_id, user_id)
+      )
+    `;
+    await sql`
       CREATE TABLE IF NOT EXISTS recipes (
         id            SERIAL PRIMARY KEY,
         user_id       INTEGER NOT NULL DEFAULT 1,
+        family_id     INTEGER,
+        created_by    INTEGER,
         name          TEXT NOT NULL,
         description   TEXT,
         servings      INTEGER NOT NULL DEFAULT 1,
@@ -25,9 +46,47 @@ async function ensureRecipesTable() {
       )
     `;
     await sql`CREATE INDEX IF NOT EXISTS idx_recipes_user_id ON recipes (user_id)`;
+    await sql`ALTER TABLE recipes ADD COLUMN IF NOT EXISTS family_id INTEGER`;
+    await sql`ALTER TABLE recipes ADD COLUMN IF NOT EXISTS created_by INTEGER`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_recipes_family_id ON recipes (family_id)`;
   } catch (error) {
     console.error("ensureRecipesTable failed:", error);
   }
+}
+
+async function resolvePrimaryFamilyId(userId: number): Promise<number> {
+  const [member] = await sql`
+    SELECT family_id
+    FROM family_memberships
+    WHERE user_id = ${userId}
+    ORDER BY (role = 'owner') DESC, created_at DESC
+    LIMIT 1
+  `;
+  if (member?.family_id) return Number(member.family_id);
+
+  const [created] = await sql`
+    INSERT INTO family_groups (owner_id, name)
+    VALUES (${userId}, 'My Family')
+    RETURNING id
+  `;
+  const familyId = Number(created.id);
+  await sql`
+    INSERT INTO family_memberships (family_id, user_id, circle, role)
+    VALUES (${familyId}, ${userId}, 'family', 'owner')
+    ON CONFLICT (family_id, user_id) DO NOTHING
+  `;
+  return familyId;
+}
+
+async function canAccessFamily(userId: number, familyId: number): Promise<boolean> {
+  const [row] = await sql`
+    SELECT id
+    FROM family_memberships
+    WHERE user_id = ${userId}
+      AND family_id = ${familyId}
+    LIMIT 1
+  `;
+  return Boolean(row?.id);
 }
 
 export async function GET(req: Request) {
@@ -37,7 +96,22 @@ export async function GET(req: Request) {
     const { userId } = authState;
     const { searchParams } = new URL(req.url);
     const tag = searchParams.get("tag");
+    const requestedFamilyId = Number(searchParams.get("family_id"));
     await ensureRecipesTable();
+    const familyId = Number.isFinite(requestedFamilyId) && requestedFamilyId > 0
+      ? requestedFamilyId
+      : await resolvePrimaryFamilyId(userId);
+    if (!(await canAccessFamily(userId, familyId))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    await sql`
+      UPDATE recipes
+      SET family_id = ${familyId},
+          created_by = COALESCE(created_by, user_id)
+      WHERE family_id IS NULL
+        AND user_id = ${userId}
+    `;
 
     let recipes;
     if (tag) {
@@ -46,7 +120,7 @@ export async function GET(req: Request) {
                calories::float, protein_g::float, carbs_g::float, fat_g::float, fiber_g::float,
                ingredients, instructions, image_url, tags, created_at::text, updated_at::text
         FROM recipes
-        WHERE user_id = ${userId}
+        WHERE family_id = ${familyId}
           AND ${tag} = ANY(tags)
         ORDER BY created_at DESC
       `;
@@ -56,7 +130,7 @@ export async function GET(req: Request) {
                calories::float, protein_g::float, carbs_g::float, fat_g::float, fiber_g::float,
                ingredients, instructions, image_url, tags, created_at::text, updated_at::text
         FROM recipes
-        WHERE user_id = ${userId}
+        WHERE family_id = ${familyId}
         ORDER BY created_at DESC
       `;
     }
@@ -72,6 +146,10 @@ export async function POST(req: Request) {
     if ("response" in authState) return authState.response;
     const { userId } = authState;
     await ensureRecipesTable();
+    const familyId = await resolvePrimaryFamilyId(userId);
+    if (!(await canAccessFamily(userId, familyId))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const body = await req.json();
     const {
@@ -95,8 +173,10 @@ export async function POST(req: Request) {
 
     const [recipe] = await sql`
       INSERT INTO recipes
-        (user_id, name, description, servings, calories, protein_g, carbs_g, fat_g, fiber_g, ingredients, instructions, image_url, tags)
+        (user_id, family_id, created_by, name, description, servings, calories, protein_g, carbs_g, fat_g, fiber_g, ingredients, instructions, image_url, tags)
       VALUES (
+        ${userId},
+        ${familyId},
         ${userId},
         ${name},
         ${description ?? null},

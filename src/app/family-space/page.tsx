@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Baby, HeartHandshake, Trash2, UserPlus } from "lucide-react";
+import { Baby, BellRing, Check, HeartHandshake, Trash2, UserPlus, X } from "lucide-react";
 
 type Circle = "family" | "extended";
 
@@ -30,6 +30,19 @@ interface Invite {
   circle: Circle;
   status: string;
   created_at: string;
+  accepted_at?: string | null;
+}
+
+interface PendingInviteNotification {
+  id: number;
+  family_id: number;
+  family_name: string;
+  email: string;
+  circle: Circle;
+  status: "pending";
+  created_at: string;
+  invited_by: number;
+  invited_by_name?: string | null;
 }
 
 interface NapLog {
@@ -53,6 +66,7 @@ interface PartnerCycle {
 interface FamilySpaceData {
   members: FamilyMember[];
   invites: Invite[];
+  pending_invites: PendingInviteNotification[];
   naps: NapLog[];
   cycle: PartnerCycle | null;
 }
@@ -64,6 +78,32 @@ function calcCycleWeek(cycle: PartnerCycle | null): number | null {
   const daysSince = Math.max(0, Math.floor((now.getTime() - start.getTime()) / 86_400_000));
   const dayInCycle = (daysSince % Math.max(1, cycle.cycle_length_days)) + 1;
   return Math.min(6, Math.max(1, Math.ceil(dayInCycle / 7)));
+}
+
+function formatCycleDate(value: string | null | undefined): string {
+  if (!value) return "Not set";
+  const parsed = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function cycleWeekLabel(week: number | null): string {
+  switch (week) {
+    case 1:
+      return "Reset and recovery";
+    case 2:
+      return "Energy building";
+    case 3:
+      return "Strong and steady";
+    case 4:
+      return "Sensitivity rising";
+    case 5:
+      return "Extra support week";
+    case 6:
+      return "Late-cycle care";
+    default:
+      return "No cycle data yet";
+  }
 }
 
 export default function FamilySpacePage() {
@@ -89,6 +129,27 @@ export default function FamilySpacePage() {
   const [periodLength, setPeriodLength] = useState(5);
   const [cycleNotes, setCycleNotes] = useState("");
 
+  const generateCycleTips = useCallback(async () => {
+    const week = calcCycleWeek(data?.cycle ?? null);
+    if (!week) return;
+    setTipsLoading(true);
+    try {
+      const res = await fetch("/api/family-space/recommendations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          week_of_cycle: week,
+          partner_name: partnerName || "your partner",
+          notes: cycleNotes,
+        }),
+      });
+      const parsed = (await res.json().catch(() => null)) as { summary: string; tips: string[]; avoid: string[] } | null;
+      if (res.ok && parsed) setTips(parsed);
+    } finally {
+      setTipsLoading(false);
+    }
+  }, [cycleNotes, data?.cycle, partnerName]);
+
   async function load() {
     setLoading(true);
     try {
@@ -113,6 +174,11 @@ export default function FamilySpacePage() {
     load().catch(() => undefined);
   }, []);
 
+  useEffect(() => {
+    if (!data?.cycle || tips || tipsLoading) return;
+    generateCycleTips().catch(() => undefined);
+  }, [data?.cycle, generateCycleTips, tips, tipsLoading]);
+
   async function runAction(payload: Record<string, unknown>) {
     setSaving(true);
     setActionMessage("");
@@ -123,15 +189,18 @@ export default function FamilySpacePage() {
         body: JSON.stringify(payload),
       });
       const raw = await res.text().catch(() => "");
-      let parsed: { error?: string } = {};
+      let parsed: { error?: string; message?: string } = {};
       try {
-        parsed = raw ? (JSON.parse(raw) as { error?: string }) : {};
+        parsed = raw ? (JSON.parse(raw) as { error?: string; message?: string }) : {};
       } catch {
         parsed = {};
       }
       if (!res.ok) {
         setActionMessage(parsed.error ?? "Unable to save family update.");
         return false;
+      }
+      if (parsed.message) {
+        setActionMessage(parsed.message);
       }
       await load();
       return true;
@@ -140,27 +209,6 @@ export default function FamilySpacePage() {
       return false;
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function generateCycleTips() {
-    const week = calcCycleWeek(data?.cycle ?? null);
-    if (!week) return;
-    setTipsLoading(true);
-    try {
-      const res = await fetch("/api/family-space/recommendations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          week_of_cycle: week,
-          partner_name: partnerName || "your partner",
-          notes: cycleNotes,
-        }),
-      });
-      const parsed = (await res.json().catch(() => null)) as { summary: string; tips: string[]; avoid: string[] } | null;
-      if (res.ok && parsed) setTips(parsed);
-    } finally {
-      setTipsLoading(false);
     }
   }
 
@@ -224,6 +272,46 @@ export default function FamilySpacePage() {
               </div>
               {actionMessage ? <p className="text-sm text-muted-foreground">{actionMessage}</p> : null}
 
+              {data.pending_invites.length > 0 && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <BellRing className="h-4 w-4 text-amber-700" />
+                    <p className="text-sm font-semibold text-amber-900">Pending family notifications</p>
+                  </div>
+                  <div className="space-y-2">
+                    {data.pending_invites.map((invite) => (
+                      <div key={invite.id} className="rounded-lg border border-amber-200 bg-white p-3">
+                        <p className="text-sm font-medium">Join {invite.family_name}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {invite.invited_by_name || "A family member"} invited you to the{" "}
+                          <span className="capitalize">{invite.circle}</span> circle so you can share the family space
+                          and grocery list.
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            disabled={saving}
+                            onClick={() => runAction({ action: "accept_invite", invite_id: invite.id })}
+                          >
+                            <Check className="h-3.5 w-3.5 mr-1" />
+                            Accept
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={saving}
+                            onClick={() => runAction({ action: "decline_invite", invite_id: invite.id })}
+                          >
+                            <X className="h-3.5 w-3.5 mr-1" />
+                            Decline
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="grid md:grid-cols-2 gap-3">
                 <div className="rounded-lg border p-3">
                   <p className="text-sm font-semibold mb-2">Family Circle</p>
@@ -249,7 +337,7 @@ export default function FamilySpacePage() {
                   <div className="space-y-1 text-sm">
                     {data.invites.slice(0, 8).map((invite) => (
                       <p key={invite.id}>
-                        {invite.email} · <span className="capitalize">{invite.circle}</span> ·{" "}
+                        {invite.email} {"\u00b7"} <span className="capitalize">{invite.circle}</span> {"\u00b7"}{" "}
                         <Badge variant="outline" className="text-[10px]">{invite.status}</Badge>
                       </p>
                     ))}
@@ -310,7 +398,7 @@ export default function FamilySpacePage() {
                       <div className="text-sm">
                         <p className="font-medium">{nap.kid_name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {nap.nap_date} {nap.start_time ? `· ${nap.start_time}` : ""}{nap.end_time ? ` - ${nap.end_time}` : ""}
+                          {nap.nap_date} {nap.start_time ? `\u00b7 ${nap.start_time}` : ""}{nap.end_time ? ` - ${nap.end_time}` : ""}
                         </p>
                       </div>
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => runAction({ action: "delete_nap", id: nap.id })}>
@@ -330,6 +418,83 @@ export default function FamilySpacePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                {data.cycle && (
+                  <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold">
+                          {(data.cycle.partner_name || partnerName || "Partner") + "'s current cycle"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Week {cycleWeek ?? "-"} - {cycleWeekLabel(cycleWeek)}
+                        </p>
+                      </div>
+                      {cycleWeek && (
+                        <Badge variant="secondary" className="shrink-0">
+                          Week {cycleWeek}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="rounded-lg border bg-background px-3 py-2">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Cycle Start</p>
+                        <p className="font-medium mt-1">{formatCycleDate(data.cycle.cycle_start_date)}</p>
+                      </div>
+                      <div className="rounded-lg border bg-background px-3 py-2">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Cadence</p>
+                        <p className="font-medium mt-1">
+                          {data.cycle.cycle_length_days} day cycle / {data.cycle.period_length_days} day period
+                        </p>
+                      </div>
+                    </div>
+
+                    {data.cycle.notes ? (
+                      <div className="rounded-lg border bg-background px-3 py-2">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Notes</p>
+                        <p className="text-sm mt-1 text-muted-foreground">{data.cycle.notes}</p>
+                      </div>
+                    ) : null}
+
+                    <div className="rounded-lg border bg-background px-3 py-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold">Current partner tips</p>
+                        <Button variant="outline" size="sm" disabled={!cycleWeek || tipsLoading} onClick={generateCycleTips}>
+                          {tipsLoading ? "Refreshing..." : "Refresh Tips"}
+                        </Button>
+                      </div>
+
+                      {tips ? (
+                        <div className="space-y-3">
+                          <p className="text-sm text-muted-foreground">{tips.summary}</p>
+                          <div>
+                            <p className="text-xs font-semibold uppercase text-muted-foreground">This week</p>
+                            <ul className="mt-1 space-y-1 text-sm">
+                              {tips.tips.slice(0, 4).map((tip) => (
+                                <li key={tip}>- {tip}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          {tips.avoid.length > 0 ? (
+                            <div>
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">Avoid</p>
+                              <ul className="mt-1 space-y-1 text-sm">
+                                {tips.avoid.slice(0, 3).map((tip) => (
+                                  <li key={tip}>- {tip}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Generate tips to see weekly support ideas here.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-2">
                   <Input placeholder="Partner name" value={partnerName} onChange={(e) => setPartnerName(e.target.value)} />
                   <Input type="date" value={cycleStart} onChange={(e) => setCycleStart(e.target.value)} />

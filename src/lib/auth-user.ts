@@ -59,6 +59,7 @@ async function ensureMultiUserSchemaInternal() {
       email                 TEXT,
       phone                 TEXT,
       profile_image_url     TEXT,
+      account_type          TEXT NOT NULL DEFAULT 'regular',
       dietary_restrictions  TEXT[],
       calorie_goal          NUMERIC,
       protein_goal_g        NUMERIC,
@@ -74,6 +75,7 @@ async function ensureMultiUserSchemaInternal() {
     )
   `;
   await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS calorie_goal NUMERIC`;
+  await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'regular'`;
   await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS protein_goal_g NUMERIC`;
   await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS carbs_goal_g NUMERIC`;
   await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fat_goal_g NUMERIC`;
