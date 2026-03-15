@@ -98,13 +98,17 @@ function AddedByBadge({ item }: { item: GroceryItem }) {
 }
 
 function GroceryThumb({ item }: { item: GroceryItem }) {
-  if (item.image_url) {
+  const [failed, setFailed] = useState(false);
+
+  if (item.image_url && !failed) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
+        key={`${item.id}-${item.image_url}`}
         src={item.image_url}
         alt={item.name}
         className="h-12 w-12 rounded-lg border object-cover bg-muted shrink-0"
+        onError={() => setFailed(true)}
       />
     );
   }

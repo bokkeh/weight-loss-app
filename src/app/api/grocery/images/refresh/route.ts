@@ -51,46 +51,21 @@ async function resolveGroceryFamilyId(userId: number): Promise<number> {
   return familyId;
 }
 
-function pickOpenFoodFactsImage(product: Record<string, unknown> | null): string | null {
-  if (!product) return null;
-
-  const candidates = [
-    product.image_front_small_url,
-    product.image_front_thumb_url,
-    product.image_front_url,
-    (product.selected_images as { front?: { display?: { en?: string; ["400"]?: string } } } | undefined)?.front?.display?.en,
-    (product.selected_images as { front?: { display?: { ["400"]?: string } } } | undefined)?.front?.display?.["400"],
-  ];
-
-  for (const value of candidates) {
-    if (typeof value === "string" && value.startsWith("http")) {
-      return value;
-    }
-  }
-  return null;
+function normalizeIngredientName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/\b(fresh|large|small|extra|organic|raw|frozen|boneless|skinless|lean|low-fat|low sodium)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-async function lookupFoodImage(name: string): Promise<string | null> {
-  const params = new URLSearchParams({
-    search_terms: name,
-    search_simple: "1",
-    action: "process",
-    json: "1",
-    page_size: "1",
-    fields: "product_name,image_front_small_url,image_front_thumb_url,image_front_url,selected_images",
-  });
-
-  const res = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?${params.toString()}`, {
-    headers: {
-      "User-Agent": "WeightTrack Grocery Images/1.0",
-    },
-    next: { revalidate: 60 * 60 * 24 * 14 },
-  });
-
-  if (!res.ok) return null;
-  const data = (await res.json().catch(() => null)) as { products?: Array<Record<string, unknown>> } | null;
-  const product = Array.isArray(data?.products) ? data.products[0] : null;
-  return pickOpenFoodFactsImage(product);
+function buildMealDbImageUrl(name: string): string | null {
+  const normalized = normalizeIngredientName(name);
+  if (!normalized) return null;
+  const ingredient = normalized.split(" ").slice(0, 3).join(" ");
+  return `https://www.themealdb.com/images/ingredients/${encodeURIComponent(ingredient)}-small.png`;
 }
 
 export async function POST(req: Request) {
@@ -121,7 +96,7 @@ export async function POST(req: Request) {
 
     const updated = [];
     for (const row of candidates) {
-      const imageUrl = await lookupFoodImage(String(row.name ?? ""));
+      const imageUrl = buildMealDbImageUrl(String(row.name ?? ""));
       const [saved] = await sql`
         UPDATE grocery_items
         SET
