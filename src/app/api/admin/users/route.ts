@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { requireAdminUser } from "@/lib/route-auth";
 
+const ADMIN_TIME_ZONE = "America/Chicago";
+
 export async function GET() {
   const adminState = await requireAdminUser();
   if ("response" in adminState) return adminState.response;
@@ -37,7 +39,10 @@ export async function GET() {
         SELECT
           user_id,
           MAX(logged_in_at) AS last_login_at,
-          COUNT(*) FILTER (WHERE logged_in_at::date = CURRENT_DATE)::int AS logins_today,
+          COUNT(*) FILTER (
+            WHERE (logged_in_at AT TIME ZONE ${ADMIN_TIME_ZONE})::date =
+                  (NOW() AT TIME ZONE ${ADMIN_TIME_ZONE})::date
+          )::int AS logins_today,
           MAX(email) FILTER (WHERE email IS NOT NULL AND TRIM(email) <> '') AS last_login_email
         FROM auth_login_events
         GROUP BY user_id
@@ -63,11 +68,12 @@ export async function GET() {
 
     const daily = await sql`
       SELECT
-        logged_in_at::date::text AS day,
+        ((logged_in_at AT TIME ZONE ${ADMIN_TIME_ZONE})::date)::text AS day,
         COUNT(*)::int AS login_count
       FROM auth_login_events
-      WHERE logged_in_at >= CURRENT_DATE - INTERVAL '14 days'
-      GROUP BY logged_in_at::date
+      WHERE (logged_in_at AT TIME ZONE ${ADMIN_TIME_ZONE})::date >=
+            ((NOW() AT TIME ZONE ${ADMIN_TIME_ZONE})::date - 13)
+      GROUP BY (logged_in_at AT TIME ZONE ${ADMIN_TIME_ZONE})::date
       ORDER BY day DESC
     `;
 
