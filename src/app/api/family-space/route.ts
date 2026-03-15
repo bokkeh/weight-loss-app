@@ -85,6 +85,7 @@ export async function GET(req: Request) {
     `;
 
     return NextResponse.json({
+      current_user_id: userId,
       family,
       members,
       invites,
@@ -235,6 +236,85 @@ export async function POST(req: Request) {
         WHERE id = ${inviteId}
       `;
       return NextResponse.json({ ok: true, message: "Invite declined." });
+    }
+
+    if (action === "cancel_invite") {
+      const inviteId = Number(body.invite_id);
+      if (!Number.isFinite(inviteId) || inviteId <= 0) {
+        return NextResponse.json({ error: "Invite id is required." }, { status: 400 });
+      }
+
+      const [family] = await sql`
+        SELECT owner_id
+        FROM family_groups
+        WHERE id = ${familyId}
+        LIMIT 1
+      `;
+      if (Number(family?.owner_id) !== userId) {
+        return NextResponse.json({ error: "Only the family owner can cancel invites." }, { status: 403 });
+      }
+
+      const [invite] = await sql`
+        SELECT id
+        FROM family_invites
+        WHERE id = ${inviteId}
+          AND family_id = ${familyId}
+          AND status = 'pending'
+        LIMIT 1
+      `;
+      if (!invite?.id) {
+        return NextResponse.json({ error: "Pending invite not found." }, { status: 404 });
+      }
+
+      await sql`
+        DELETE FROM family_invites
+        WHERE id = ${inviteId}
+      `;
+      return NextResponse.json({ ok: true, message: "Pending invite canceled." });
+    }
+
+    if (action === "remove_member") {
+      const memberUserId = Number(body.member_user_id);
+      if (!Number.isFinite(memberUserId) || memberUserId <= 0) {
+        return NextResponse.json({ error: "Member user id is required." }, { status: 400 });
+      }
+
+      const [family] = await sql`
+        SELECT owner_id
+        FROM family_groups
+        WHERE id = ${familyId}
+        LIMIT 1
+      `;
+      if (Number(family?.owner_id) !== userId) {
+        return NextResponse.json({ error: "Only the family owner can remove members." }, { status: 403 });
+      }
+      if (memberUserId === userId) {
+        return NextResponse.json({ error: "The family owner cannot remove themselves." }, { status: 400 });
+      }
+
+      const [member] = await sql`
+        SELECT id
+        FROM family_memberships
+        WHERE family_id = ${familyId}
+          AND user_id = ${memberUserId}
+        LIMIT 1
+      `;
+      if (!member?.id) {
+        return NextResponse.json({ error: "Member not found." }, { status: 404 });
+      }
+
+      await sql`
+        DELETE FROM family_memberships
+        WHERE family_id = ${familyId}
+          AND user_id = ${memberUserId}
+      `;
+      await sql`
+        UPDATE grocery_items
+        SET family_id = NULL
+        WHERE user_id = ${memberUserId}
+          AND family_id = ${familyId}
+      `;
+      return NextResponse.json({ ok: true, message: "Family member removed." });
     }
 
     if (action === "add_grocery") {

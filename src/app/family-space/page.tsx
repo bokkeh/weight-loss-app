@@ -9,15 +9,35 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Baby, BellRing, Check, HeartHandshake, Trash2, UserPlus, X } from "lucide-react";
+import {
+  Baby,
+  BellRing,
+  Check,
+  Clock3,
+  HeartHandshake,
+  Shield,
+  Trash2,
+  UserPlus,
+  UserX,
+  Users,
+  X,
+} from "lucide-react";
 
 type Circle = "family" | "extended";
+
+interface FamilyInfo {
+  id: number;
+  owner_id: number;
+  name: string;
+  created_at: string;
+}
 
 interface FamilyMember {
   id: number;
   user_id: number;
   circle: Circle;
   role: string;
+  created_at?: string;
   first_name?: string;
   last_name?: string;
   email?: string;
@@ -64,6 +84,8 @@ interface PartnerCycle {
 }
 
 interface FamilySpaceData {
+  current_user_id: number;
+  family: FamilyInfo;
   members: FamilyMember[];
   invites: Invite[];
   pending_invites: PendingInviteNotification[];
@@ -87,6 +109,13 @@ function formatCycleDate(value: string | null | undefined): string {
   return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function formatShortDate(value: string | null | undefined): string {
+  if (!value) return "Unknown";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 function cycleWeekLabel(week: number | null): string {
   switch (week) {
     case 1:
@@ -104,6 +133,10 @@ function cycleWeekLabel(week: number | null): string {
     default:
       return "No cycle data yet";
   }
+}
+
+function getMemberLabel(member: FamilyMember): string {
+  return `${member.first_name ?? ""} ${member.last_name ?? ""}`.trim() || member.email || `User ${member.user_id}`;
 }
 
 export default function FamilySpacePage() {
@@ -199,9 +232,7 @@ export default function FamilySpacePage() {
         setActionMessage(parsed.error ?? "Unable to save family update.");
         return false;
       }
-      if (parsed.message) {
-        setActionMessage(parsed.message);
-      }
+      if (parsed.message) setActionMessage(parsed.message);
       await load();
       return true;
     } catch (error) {
@@ -212,22 +243,28 @@ export default function FamilySpacePage() {
     }
   }
 
-  const familyMembers = useMemo(
-    () => (data?.members ?? []).filter((m) => m.circle === "family"),
+  const acceptedInvites = useMemo(
+    () => (data?.invites ?? []).filter((invite) => invite.status === "accepted"),
     [data]
   );
-  const extendedMembers = useMemo(
-    () => (data?.members ?? []).filter((m) => m.circle === "extended"),
+  const sentPendingInvites = useMemo(
+    () => (data?.invites ?? []).filter((invite) => invite.status === "pending"),
+    [data]
+  );
+  const declinedInvites = useMemo(
+    () => (data?.invites ?? []).filter((invite) => invite.status === "declined"),
     [data]
   );
   const cycleWeek = calcCycleWeek(data?.cycle ?? null);
+  const ownerId = data?.family?.owner_id ?? null;
+  const isOwner = Boolean(ownerId && data?.current_user_id === ownerId);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Family Space</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Invite loved ones, organize family circles, and track home rhythms together.
+          Manage who is in your family space, who is still pending, and what access each person has.
         </p>
       </div>
 
@@ -242,11 +279,26 @@ export default function FamilySpacePage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <UserPlus className="h-4 w-4" />
-                Circles and Invites
+                <Users className="h-4 w-4" />
+                Family Management
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border bg-muted/20 p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Accepted Members</p>
+                  <p className="mt-1 text-2xl font-semibold">{data.members.length}</p>
+                </div>
+                <div className="rounded-lg border bg-amber-50 p-3">
+                  <p className="text-xs uppercase tracking-wide text-amber-700">Pending Invites</p>
+                  <p className="mt-1 text-2xl font-semibold text-amber-900">{sentPendingInvites.length}</p>
+                </div>
+                <div className="rounded-lg border bg-emerald-50 p-3">
+                  <p className="text-xs uppercase tracking-wide text-emerald-700">Accepted Invites</p>
+                  <p className="mt-1 text-2xl font-semibold text-emerald-900">{acceptedInvites.length}</p>
+                </div>
+              </div>
+
               <div className="grid sm:grid-cols-[1fr_170px_auto] gap-2">
                 <Input
                   placeholder="Invite by email"
@@ -267,33 +319,39 @@ export default function FamilySpacePage() {
                     if (ok) setInviteEmail("");
                   }}
                 >
+                  <UserPlus className="mr-1 h-4 w-4" />
                   Invite
                 </Button>
               </div>
+
               {actionMessage ? <p className="text-sm text-muted-foreground">{actionMessage}</p> : null}
 
               {data.pending_invites.length > 0 && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-3">
                   <div className="flex items-center gap-2">
                     <BellRing className="h-4 w-4 text-amber-700" />
-                    <p className="text-sm font-semibold text-amber-900">Pending family notifications</p>
+                    <p className="text-sm font-semibold text-amber-900">Invites waiting for your response</p>
                   </div>
                   <div className="space-y-2">
                     {data.pending_invites.map((invite) => (
                       <div key={invite.id} className="rounded-lg border border-amber-200 bg-white p-3">
-                        <p className="text-sm font-medium">Join {invite.family_name}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {invite.invited_by_name || "A family member"} invited you to the{" "}
-                          <span className="capitalize">{invite.circle}</span> circle so you can share the family space
-                          and grocery list.
-                        </p>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">Join {invite.family_name}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {invite.invited_by_name || "A family member"} invited you to the{" "}
+                              <span className="capitalize">{invite.circle}</span> circle.
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="border-amber-300 text-amber-800">Needs response</Badge>
+                        </div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <Button
                             size="sm"
                             disabled={saving}
                             onClick={() => runAction({ action: "accept_invite", invite_id: invite.id })}
                           >
-                            <Check className="h-3.5 w-3.5 mr-1" />
+                            <Check className="mr-1 h-3.5 w-3.5" />
                             Accept
                           </Button>
                           <Button
@@ -302,7 +360,7 @@ export default function FamilySpacePage() {
                             disabled={saving}
                             onClick={() => runAction({ action: "decline_invite", invite_id: invite.id })}
                           >
-                            <X className="h-3.5 w-3.5 mr-1" />
+                            <X className="mr-1 h-3.5 w-3.5" />
                             Decline
                           </Button>
                         </div>
@@ -312,38 +370,130 @@ export default function FamilySpacePage() {
                 </div>
               )}
 
-              <div className="grid md:grid-cols-2 gap-3">
-                <div className="rounded-lg border p-3">
-                  <p className="text-sm font-semibold mb-2">Family Circle</p>
-                  <div className="space-y-1.5">
-                    {familyMembers.map((m) => (
-                      <p key={m.id} className="text-sm">{`${m.first_name ?? ""} ${m.last_name ?? ""}`.trim() || m.email || `User ${m.user_id}`}</p>
-                    ))}
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-xl border p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold">People with access</p>
+                      <p className="text-xs text-muted-foreground">Accepted and already inside this family space.</p>
+                    </div>
+                    {isOwner && (
+                      <Badge variant="secondary">
+                        <Shield className="mr-1 h-3 w-3" />
+                        Owner controls
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="mt-3 space-y-2">
+                    {data.members.map((member) => {
+                      const removable = isOwner && member.role !== "owner";
+                      return (
+                        <div key={member.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-medium">{getMemberLabel(member)}</p>
+                              <Badge variant={member.role === "owner" ? "default" : "outline"}>
+                                {member.role === "owner" ? "Owner" : "Accepted"}
+                              </Badge>
+                              <Badge variant="outline" className="capitalize">{member.circle}</Badge>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {member.email || "No email on file"} {"\u00b7"} Joined {formatShortDate(member.created_at)}
+                            </p>
+                          </div>
+                          {removable ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={saving}
+                              onClick={() => runAction({ action: "remove_member", member_user_id: member.user_id })}
+                            >
+                              <UserX className="mr-1 h-3.5 w-3.5" />
+                              Remove
+                            </Button>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-                <div className="rounded-lg border p-3">
-                  <p className="text-sm font-semibold mb-2">Extended Family</p>
-                  <div className="space-y-1.5">
-                    {extendedMembers.map((m) => (
-                      <p key={m.id} className="text-sm">{`${m.first_name ?? ""} ${m.last_name ?? ""}`.trim() || m.email || `User ${m.user_id}`}</p>
-                    ))}
+
+                <div className="rounded-xl border p-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold">Pending and recent invites</p>
+                    <p className="text-xs text-muted-foreground">See who is still waiting, who joined, and who declined.</p>
                   </div>
+
+                  <div className="space-y-2">
+                    {sentPendingInvites.length === 0 ? (
+                      <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                        No invites are currently waiting on a response.
+                      </div>
+                    ) : (
+                      sentPendingInvites.map((invite) => (
+                        <div key={invite.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-medium">{invite.email}</p>
+                              <Badge variant="outline" className="border-amber-300 text-amber-800">
+                                <Clock3 className="mr-1 h-3 w-3" />
+                                Pending
+                              </Badge>
+                              <Badge variant="outline" className="capitalize">{invite.circle}</Badge>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">Sent {formatShortDate(invite.created_at)}</p>
+                          </div>
+                          {isOwner ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={saving}
+                              onClick={() => runAction({ action: "cancel_invite", invite_id: invite.id })}
+                            >
+                              Cancel
+                            </Button>
+                          ) : null}
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {acceptedInvites.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accepted</p>
+                      {acceptedInvites.slice(0, 5).map((invite) => (
+                        <div key={invite.id} className="flex items-center justify-between rounded-lg border p-3">
+                          <div>
+                            <p className="text-sm font-medium">{invite.email}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Accepted {formatShortDate(invite.accepted_at || invite.created_at)}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="border-emerald-300 text-emerald-800">Accepted</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {declinedInvites.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Declined</p>
+                      {declinedInvites.slice(0, 5).map((invite) => (
+                        <div key={invite.id} className="flex items-center justify-between rounded-lg border p-3">
+                          <div>
+                            <p className="text-sm font-medium">{invite.email}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Declined after invite sent {formatShortDate(invite.created_at)}
+                            </p>
+                          </div>
+                          <Badge variant="outline">Declined</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-
-              {data.invites.length > 0 && (
-                <div className="rounded-lg border p-3">
-                  <p className="text-sm font-semibold mb-2">Recent Invites</p>
-                  <div className="space-y-1 text-sm">
-                    {data.invites.slice(0, 8).map((invite) => (
-                      <p key={invite.id}>
-                        {invite.email} {"\u00b7"} <span className="capitalize">{invite.circle}</span> {"\u00b7"}{" "}
-                        <Badge variant="outline" className="text-[10px]">{invite.status}</Badge>
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
 
