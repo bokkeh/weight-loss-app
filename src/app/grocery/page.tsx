@@ -11,6 +11,7 @@ import { Check, CheckCircle2, Circle, GripVertical, ListChecks, Pencil, Share2, 
 
 interface GroceryItem {
   id: number;
+  user_id?: number;
   name: string;
   quantity: string | null;
   liked: boolean;
@@ -20,6 +21,7 @@ interface GroceryItem {
   source: string;
   recipe_id?: number | null;
   created_at: string;
+  added_by_name?: string | null;
 }
 
 type GroceryGroupKey = "liked" | "fruits" | "veggies" | "breads" | "meats" | "dairy" | "spices_sauces" | "sweets" | "misc";
@@ -426,6 +428,9 @@ export default function GroceryPage() {
                         <div key={`fav-${fav.id}`} className="shrink-0 rounded-lg border px-3 py-2 min-w-56 bg-background">
                           <p className="text-sm font-medium truncate">{fav.name}</p>
                           <p className="text-xs text-muted-foreground">{fav.quantity || "No quantity"}</p>
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            Added by {fav.added_by_name || "a family member"}
+                          </p>
                           <Button
                             size="sm"
                             variant="outline"
@@ -571,8 +576,10 @@ export default function GroceryPage() {
                               </Button>
                             </div>
                           ) : (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
                               <span>{item.quantity || "No quantity"} | {item.source}</span>
+                              <span>·</span>
+                              <span>Added by {item.added_by_name || "a family member"}</span>
                               <button
                                 type="button"
                                 onClick={() => startEditQuantity(item)}

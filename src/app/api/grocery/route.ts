@@ -2,6 +2,31 @@ import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { requireUserId } from "@/lib/route-auth";
 
+const GROCERY_ITEM_SELECT = sql`
+  grocery_items.id,
+  grocery_items.user_id,
+  grocery_items.family_id,
+  grocery_items.name,
+  grocery_items.quantity,
+  grocery_items.liked,
+  grocery_items.category,
+  grocery_items.sort_order,
+  grocery_items.checked,
+  grocery_items.source,
+  grocery_items.recipe_id,
+  grocery_items.created_at::text,
+  NULLIF(
+    TRIM(
+      CONCAT(
+        COALESCE(user_profiles.first_name, ''),
+        ' ',
+        COALESCE(user_profiles.last_name, '')
+      )
+    ),
+    ''
+  ) AS added_by_name
+`;
+
 function normalizeIngredientLines(raw: string): Array<{ name: string; quantity: string | null }> {
   return raw
     .split(/\r?\n|,/g)
@@ -103,9 +128,10 @@ export async function GET(req: Request) {
         AND user_id = ${userId}
     `;
     const items = await sql`
-      SELECT id, user_id, family_id, name, quantity, liked, category, sort_order, checked, source, recipe_id, created_at::text
+      SELECT ${GROCERY_ITEM_SELECT}
       FROM grocery_items
-      WHERE family_id = ${familyId}
+      LEFT JOIN user_profiles ON user_profiles.id = grocery_items.user_id
+      WHERE grocery_items.family_id = ${familyId}
       ORDER BY checked ASC, sort_order ASC, created_at DESC
     `;
     return NextResponse.json(items);
@@ -158,14 +184,21 @@ export async function POST(req: Request) {
           INSERT INTO grocery_items (user_id, name, quantity, source, recipe_id, sort_order)
           SELECT ${userId}, ${item.name}, ${item.quantity}, 'recipe', ${recipeId}, next_sort.value
           FROM next_sort
-          RETURNING id, user_id, name, quantity, liked, category, sort_order, checked, source, recipe_id, created_at::text
+          RETURNING id
         `;
         await sql`
           UPDATE grocery_items
           SET family_id = ${familyId}
           WHERE id = ${row.id}
         `;
-        inserted.push(row);
+        const [hydrated] = await sql`
+          SELECT ${GROCERY_ITEM_SELECT}
+          FROM grocery_items
+          LEFT JOIN user_profiles ON user_profiles.id = grocery_items.user_id
+          WHERE grocery_items.id = ${row.id}
+          LIMIT 1
+        `;
+        inserted.push(hydrated);
       }
       return NextResponse.json(inserted, { status: 201 });
     }
@@ -187,9 +220,16 @@ export async function POST(req: Request) {
           INSERT INTO grocery_items (user_id, family_id, name, quantity, source, sort_order)
           SELECT ${userId}, ${familyId}, ${name}, ${quantity}, 'ai', next_sort.value
           FROM next_sort
-          RETURNING id, user_id, family_id, name, quantity, liked, category, sort_order, checked, source, recipe_id, created_at::text
+          RETURNING id
         `;
-        inserted.push(row);
+        const [hydrated] = await sql`
+          SELECT ${GROCERY_ITEM_SELECT}
+          FROM grocery_items
+          LEFT JOIN user_profiles ON user_profiles.id = grocery_items.user_id
+          WHERE grocery_items.id = ${row.id}
+          LIMIT 1
+        `;
+        inserted.push(hydrated);
       }
       return NextResponse.json(inserted, { status: 201 });
     }
@@ -209,9 +249,16 @@ export async function POST(req: Request) {
       INSERT INTO grocery_items (user_id, family_id, name, quantity, source, sort_order)
       SELECT ${userId}, ${familyId}, ${name}, ${quantity}, 'manual', next_sort.value
       FROM next_sort
-      RETURNING id, user_id, family_id, name, quantity, liked, category, sort_order, checked, source, recipe_id, created_at::text
+      RETURNING id
     `;
-    return NextResponse.json(created, { status: 201 });
+    const [hydrated] = await sql`
+      SELECT ${GROCERY_ITEM_SELECT}
+      FROM grocery_items
+      LEFT JOIN user_profiles ON user_profiles.id = grocery_items.user_id
+      WHERE grocery_items.id = ${created.id}
+      LIMIT 1
+    `;
+    return NextResponse.json(hydrated, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }

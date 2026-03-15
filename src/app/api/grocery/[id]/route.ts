@@ -2,6 +2,31 @@ import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { requireUserId } from "@/lib/route-auth";
 
+const GROCERY_ITEM_SELECT = sql`
+  grocery_items.id,
+  grocery_items.user_id,
+  grocery_items.family_id,
+  grocery_items.name,
+  grocery_items.quantity,
+  grocery_items.liked,
+  grocery_items.category,
+  grocery_items.sort_order,
+  grocery_items.checked,
+  grocery_items.source,
+  grocery_items.recipe_id,
+  grocery_items.created_at::text,
+  NULLIF(
+    TRIM(
+      CONCAT(
+        COALESCE(user_profiles.first_name, ''),
+        ' ',
+        COALESCE(user_profiles.last_name, '')
+      )
+    ),
+    ''
+  ) AS added_by_name
+`;
+
 async function ensureGroceryScopeSchema() {
   await sql`
     CREATE TABLE IF NOT EXISTS family_groups (
@@ -98,13 +123,20 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
         name = COALESCE(${name || null}, name),
         quantity = COALESCE(${quantity || null}, quantity)
       WHERE id = ${itemId} AND family_id = ${familyId}
-      RETURNING id, user_id, family_id, name, quantity, liked, category, sort_order, checked, source, recipe_id, created_at::text
+      RETURNING id
     `;
 
     if (!updated) {
       return NextResponse.json({ error: "Item not found." }, { status: 404 });
     }
-    return NextResponse.json(updated);
+    const [hydrated] = await sql`
+      SELECT ${GROCERY_ITEM_SELECT}
+      FROM grocery_items
+      LEFT JOIN user_profiles ON user_profiles.id = grocery_items.user_id
+      WHERE grocery_items.id = ${updated.id}
+      LIMIT 1
+    `;
+    return NextResponse.json(hydrated);
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
