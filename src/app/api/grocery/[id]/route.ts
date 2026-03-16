@@ -4,7 +4,6 @@ import sql from "@/lib/db";
 import {
   archivePurchasedGroceryItem,
   ensureGrocerySchema,
-  GROCERY_ITEM_SELECT,
   resolveGroceryFamilyId,
 } from "@/lib/grocery";
 
@@ -72,7 +71,31 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
       return NextResponse.json({ error: "Item not found." }, { status: 404 });
     }
     const [hydrated] = await sql`
-      SELECT ${GROCERY_ITEM_SELECT}
+      SELECT
+        grocery_items.id,
+        grocery_items.user_id,
+        grocery_items.family_id,
+        grocery_items.name,
+        grocery_items.quantity,
+        grocery_items.liked,
+        grocery_items.category,
+        grocery_items.sort_order,
+        grocery_items.checked,
+        grocery_items.source,
+        grocery_items.recipe_id,
+        grocery_items.image_url,
+        grocery_items.image_lookup_attempted_at::text,
+        grocery_items.created_at::text,
+        NULLIF(
+          TRIM(
+            CONCAT(
+              COALESCE(user_profiles.first_name, ''),
+              ' ',
+              COALESCE(user_profiles.last_name, '')
+            )
+          ),
+          ''
+        ) AS added_by_name
       FROM grocery_items
       LEFT JOIN user_profiles ON user_profiles.id = grocery_items.user_id
       WHERE grocery_items.id = ${updated.id}

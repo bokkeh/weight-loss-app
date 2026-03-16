@@ -1,32 +1,5 @@
 import sql from "@/lib/db";
 
-export const GROCERY_ITEM_SELECT = sql`
-  grocery_items.id,
-  grocery_items.user_id,
-  grocery_items.family_id,
-  grocery_items.name,
-  grocery_items.quantity,
-  grocery_items.liked,
-  grocery_items.category,
-  grocery_items.sort_order,
-  grocery_items.checked,
-  grocery_items.source,
-  grocery_items.recipe_id,
-  grocery_items.image_url,
-  grocery_items.image_lookup_attempted_at::text,
-  grocery_items.created_at::text,
-  NULLIF(
-    TRIM(
-      CONCAT(
-        COALESCE(user_profiles.first_name, ''),
-        ' ',
-        COALESCE(user_profiles.last_name, '')
-      )
-    ),
-    ''
-  ) AS added_by_name
-`;
-
 export async function ensureGrocerySchema() {
   await sql`
     CREATE TABLE IF NOT EXISTS family_groups (

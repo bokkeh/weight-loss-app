@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { requireUserId } from "@/lib/route-auth";
-import { ensureGrocerySchema, GROCERY_ITEM_SELECT, resolveGroceryFamilyId } from "@/lib/grocery";
+import { ensureGrocerySchema, resolveGroceryFamilyId } from "@/lib/grocery";
 
 function normalizeIngredientLines(raw: string): Array<{ name: string; quantity: string | null }> {
   return raw
@@ -30,7 +30,31 @@ export async function GET(req: Request) {
         AND user_id = ${userId}
     `;
     const items = await sql`
-      SELECT ${GROCERY_ITEM_SELECT}
+      SELECT
+        grocery_items.id,
+        grocery_items.user_id,
+        grocery_items.family_id,
+        grocery_items.name,
+        grocery_items.quantity,
+        grocery_items.liked,
+        grocery_items.category,
+        grocery_items.sort_order,
+        grocery_items.checked,
+        grocery_items.source,
+        grocery_items.recipe_id,
+        grocery_items.image_url,
+        grocery_items.image_lookup_attempted_at::text,
+        grocery_items.created_at::text,
+        NULLIF(
+          TRIM(
+            CONCAT(
+              COALESCE(user_profiles.first_name, ''),
+              ' ',
+              COALESCE(user_profiles.last_name, '')
+            )
+          ),
+          ''
+        ) AS added_by_name
       FROM grocery_items
       LEFT JOIN user_profiles ON user_profiles.id = grocery_items.user_id
       WHERE grocery_items.family_id = ${familyId}
@@ -229,7 +253,31 @@ export async function POST(req: Request) {
           WHERE id = ${row.id}
         `;
         const [hydrated] = await sql`
-          SELECT ${GROCERY_ITEM_SELECT}
+          SELECT
+            grocery_items.id,
+            grocery_items.user_id,
+            grocery_items.family_id,
+            grocery_items.name,
+            grocery_items.quantity,
+            grocery_items.liked,
+            grocery_items.category,
+            grocery_items.sort_order,
+            grocery_items.checked,
+            grocery_items.source,
+            grocery_items.recipe_id,
+            grocery_items.image_url,
+            grocery_items.image_lookup_attempted_at::text,
+            grocery_items.created_at::text,
+            NULLIF(
+              TRIM(
+                CONCAT(
+                  COALESCE(user_profiles.first_name, ''),
+                  ' ',
+                  COALESCE(user_profiles.last_name, '')
+                )
+              ),
+              ''
+            ) AS added_by_name
           FROM grocery_items
           LEFT JOIN user_profiles ON user_profiles.id = grocery_items.user_id
           WHERE grocery_items.id = ${row.id}
@@ -260,7 +308,31 @@ export async function POST(req: Request) {
           RETURNING id
         `;
         const [hydrated] = await sql`
-          SELECT ${GROCERY_ITEM_SELECT}
+          SELECT
+            grocery_items.id,
+            grocery_items.user_id,
+            grocery_items.family_id,
+            grocery_items.name,
+            grocery_items.quantity,
+            grocery_items.liked,
+            grocery_items.category,
+            grocery_items.sort_order,
+            grocery_items.checked,
+            grocery_items.source,
+            grocery_items.recipe_id,
+            grocery_items.image_url,
+            grocery_items.image_lookup_attempted_at::text,
+            grocery_items.created_at::text,
+            NULLIF(
+              TRIM(
+                CONCAT(
+                  COALESCE(user_profiles.first_name, ''),
+                  ' ',
+                  COALESCE(user_profiles.last_name, '')
+                )
+              ),
+              ''
+            ) AS added_by_name
           FROM grocery_items
           LEFT JOIN user_profiles ON user_profiles.id = grocery_items.user_id
           WHERE grocery_items.id = ${row.id}
@@ -289,7 +361,31 @@ export async function POST(req: Request) {
       RETURNING id
     `;
     const [hydrated] = await sql`
-      SELECT ${GROCERY_ITEM_SELECT}
+      SELECT
+        grocery_items.id,
+        grocery_items.user_id,
+        grocery_items.family_id,
+        grocery_items.name,
+        grocery_items.quantity,
+        grocery_items.liked,
+        grocery_items.category,
+        grocery_items.sort_order,
+        grocery_items.checked,
+        grocery_items.source,
+        grocery_items.recipe_id,
+        grocery_items.image_url,
+        grocery_items.image_lookup_attempted_at::text,
+        grocery_items.created_at::text,
+        NULLIF(
+          TRIM(
+            CONCAT(
+              COALESCE(user_profiles.first_name, ''),
+              ' ',
+              COALESCE(user_profiles.last_name, '')
+            )
+          ),
+          ''
+        ) AS added_by_name
       FROM grocery_items
       LEFT JOIN user_profiles ON user_profiles.id = grocery_items.user_id
       WHERE grocery_items.id = ${created.id}
