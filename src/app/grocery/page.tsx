@@ -5,10 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { shareOrCopy } from "@/lib/shareUtils";
-import { Check, CheckCircle2, Circle, GripVertical, ListChecks, Pencil, Share2, Sparkles, Star, Trash2, X } from "lucide-react";
+import { CalendarDays, Check, Circle, GripVertical, History, ListChecks, Pencil, Share2, Sparkles, Star, Trash2, X } from "lucide-react";
 
 interface GroceryItem {
   id: number;
@@ -27,6 +28,28 @@ interface GroceryItem {
   added_by_name?: string | null;
 }
 
+interface GroceryTripItem {
+  id: number;
+  family_id?: number;
+  user_id?: number;
+  name: string;
+  quantity: string | null;
+  liked: boolean;
+  category?: GroceryGroupKey | null;
+  source: string;
+  recipe_id?: number | null;
+  image_url?: string | null;
+  purchased_at: string;
+  added_by_name?: string | null;
+}
+
+interface GroceryTrip {
+  id: number;
+  completed_on: string;
+  created_at: string;
+  items: GroceryTripItem[];
+}
+
 interface GroceryParticipant {
   user_id: number;
   circle: "family" | "extended";
@@ -43,6 +66,8 @@ interface GroceryResponse {
     id: number;
     name: string;
   } | null;
+  previous_trips?: GroceryTrip[];
+  recently_ordered?: GroceryTripItem[];
 }
 
 type GroceryGroupKey = "liked" | "fruits" | "veggies" | "breads" | "meats" | "dairy" | "spices_sauces" | "sweets" | "misc";
@@ -103,11 +128,11 @@ function inferGroup(name: string): GroceryGroupKey {
   return "misc";
 }
 
-function getAddedByLabel(item: GroceryItem): string {
+function getAddedByLabel(item: { added_by_name?: string | null }): string {
   return item.added_by_name || "Family member";
 }
 
-function getAddedByBadgeClass(item: GroceryItem): string {
+function getAddedByBadgeClass(item: { user_id?: number; added_by_name?: string | null }): string {
   const key = `${item.user_id ?? 0}:${getAddedByLabel(item)}`;
   let hash = 0;
   for (let i = 0; i < key.length; i += 1) {
@@ -116,7 +141,7 @@ function getAddedByBadgeClass(item: GroceryItem): string {
   return ADDED_BY_BADGE_STYLES[hash % ADDED_BY_BADGE_STYLES.length];
 }
 
-function AddedByBadge({ item }: { item: GroceryItem }) {
+function AddedByBadge({ item }: { item: { user_id?: number; added_by_name?: string | null } }) {
   return (
     <Badge
       variant="outline"
@@ -127,7 +152,7 @@ function AddedByBadge({ item }: { item: GroceryItem }) {
   );
 }
 
-function getItemCategory(item: GroceryItem): GroceryGroupKey {
+function getItemCategory(item: GroceryItem | GroceryTripItem): GroceryGroupKey {
   if (item.liked) return "liked";
   return item.category ?? inferGroup(item.name);
 }
@@ -143,7 +168,7 @@ function CategoryBadge({ category }: { category: GroceryGroupKey }) {
   );
 }
 
-function GroceryThumb({ item }: { item: GroceryItem }) {
+function GroceryThumb({ item }: { item: { id: number; name: string; image_url?: string | null } }) {
   const [failed, setFailed] = useState(false);
 
   if (item.image_url && !failed) {
@@ -179,7 +204,7 @@ async function readJsonSafe<T>(res: Response): Promise<T | null> {
 function checklistText(items: GroceryItem[]) {
   const lines = ["Grocery List", ""];
   for (const item of items) {
-    lines.push(`${item.checked ? "[x]" : "[ ]"} ${item.name}${item.quantity ? ` (${item.quantity})` : ""}`);
+    lines.push(`[ ] ${item.name}${item.quantity ? ` (${item.quantity})` : ""}`);
   }
   return lines.join("\n");
 }
@@ -212,11 +237,9 @@ async function buildChecklistImage(items: GroceryItem[]): Promise<File> {
   for (const item of items) {
     ctx.fillStyle = "rgba(255,255,255,0.8)";
     ctx.fillRect(40, y - 32, width - 80, 44);
-    ctx.fillStyle = item.checked ? "#16a34a" : "#0f172a";
+    ctx.fillStyle = "#0f172a";
     ctx.font = "600 28px Arial";
-    const prefix = item.checked ? "✓" : "○";
-    const text = `${prefix} ${item.name}${item.quantity ? ` (${item.quantity})` : ""}`;
-    ctx.fillText(text, 60, y);
+    ctx.fillText(`○ ${item.name}${item.quantity ? ` (${item.quantity})` : ""}`, 60, y);
     y += rowHeight;
   }
 
@@ -225,9 +248,34 @@ async function buildChecklistImage(items: GroceryItem[]): Promise<File> {
   return new File([blob], "grocery-list.png", { type: "image/png" });
 }
 
+function formatTripDate(value: string): string {
+  const date = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    timeZone: "America/Chicago",
+  }).format(date);
+}
+
+function formatPurchasedAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Chicago",
+  }).format(date);
+}
+
 export default function GroceryPage() {
   const [items, setItems] = useState<GroceryItem[]>([]);
   const [participants, setParticipants] = useState<GroceryParticipant[]>([]);
+  const [previousTrips, setPreviousTrips] = useState<GroceryTrip[]>([]);
+  const [recentlyOrdered, setRecentlyOrdered] = useState<GroceryTripItem[]>([]);
   const [familyName, setFamilyName] = useState("My Family");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -252,10 +300,14 @@ export default function GroceryPage() {
         setItems(Array.isArray(data.items) ? data.items : []);
         setParticipants(Array.isArray(data.participants) ? data.participants : []);
         setFamilyName(data.family?.name || "My Family");
+        setPreviousTrips(Array.isArray(data.previous_trips) ? data.previous_trips : []);
+        setRecentlyOrdered(Array.isArray(data.recently_ordered) ? data.recently_ordered : []);
       } else {
         setItems(res.ok && Array.isArray(data) ? data : []);
         setParticipants([]);
         setFamilyName("My Family");
+        setPreviousTrips([]);
+        setRecentlyOrdered([]);
       }
     } finally {
       setLoading(false);
@@ -268,7 +320,7 @@ export default function GroceryPage() {
 
   useEffect(() => {
     if (items.length === 0) return;
-    if (!items.some((item) => !item.image_url && !item.image_lookup_attempted_at && !item.checked)) return;
+    if (!items.some((item) => !item.image_url && !item.image_lookup_attempted_at)) return;
 
     let cancelled = false;
 
@@ -356,14 +408,61 @@ export default function GroceryPage() {
     }
   }
 
+  async function quickAddRecent(item: { name: string; quantity: string | null }) {
+    const res = await fetch("/api/grocery", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: item.name, quantity: item.quantity }),
+    });
+    const created = await readJsonSafe<GroceryItem>(res);
+    if (res.ok && created) {
+      setItems((prev) => [created, ...prev]);
+    }
+  }
+
   async function toggleItem(item: GroceryItem) {
     const res = await fetch(`/api/grocery/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ checked: !item.checked }),
     });
-    const updated = await readJsonSafe<GroceryItem>(res);
-    if (res.ok && updated) {
+    const updated = await readJsonSafe<
+      | GroceryItem
+      | {
+          archived?: boolean;
+          removed_id?: number;
+          trip?: { id: number; completed_on: string; created_at: string };
+          trip_item?: GroceryTripItem;
+        }
+    >(res);
+    if (!res.ok || !updated) return;
+
+    if ("archived" in updated && updated.archived && updated.trip && updated.trip_item) {
+      const archivedTrip = updated.trip;
+      const archivedItem = {
+        ...updated.trip_item,
+        added_by_name: updated.trip_item.added_by_name ?? item.added_by_name ?? null,
+      };
+      setItems((prev) => prev.filter((it) => it.id !== (updated.removed_id ?? item.id)));
+      setPreviousTrips((prev) => {
+        const existing = prev.find((trip) => trip.id === archivedTrip.id);
+        if (existing) {
+          return prev.map((trip) =>
+            trip.id === archivedTrip.id
+              ? { ...trip, items: [archivedItem, ...trip.items] }
+              : trip
+          );
+        }
+        return [{ ...archivedTrip, items: [archivedItem] }, ...prev];
+      });
+      setRecentlyOrdered((prev) => {
+        const next = [archivedItem, ...prev.filter((entry) => entry.name.toLowerCase() !== archivedItem.name.toLowerCase())];
+        return next.slice(0, 12);
+      });
+      return;
+    }
+
+    if ("id" in updated) {
       setItems((prev) => prev.map((it) => (it.id === updated.id ? updated : it)));
     }
   }
@@ -469,7 +568,6 @@ export default function GroceryPage() {
 
   async function shareList() {
     const sorted = [...items].sort((a, b) => {
-      if (Number(a.checked) !== Number(b.checked)) return Number(a.checked) - Number(b.checked);
       const aOrder = Number.isFinite(a.sort_order) ? Number(a.sort_order) : Number.MAX_SAFE_INTEGER;
       const bOrder = Number.isFinite(b.sort_order) ? Number(b.sort_order) : Number.MAX_SAFE_INTEGER;
       if (aOrder !== bOrder) return aOrder - bOrder;
@@ -491,7 +589,7 @@ export default function GroceryPage() {
     setTimeout(() => setShareDone(false), 2000);
   }
 
-  const remaining = useMemo(() => items.filter((i) => !i.checked).length, [items]);
+  const remaining = useMemo(() => items.length, [items]);
   const groupedItems = useMemo(() => {
     const groups: Record<GroceryGroupKey, GroceryItem[]> = {
       liked: [],
@@ -504,8 +602,7 @@ export default function GroceryPage() {
       sweets: [],
       misc: [],
     };
-    const sorted = [...items].sort((a, b) => Number(a.checked) - Number(b.checked));
-    for (const item of sorted) {
+    for (const item of items) {
       if (item.liked) {
         groups.liked.push(item);
       } else {
@@ -617,217 +714,293 @@ export default function GroceryPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-0 shadow-none bg-transparent">
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="text-sm text-muted-foreground">Loading grocery items...</div>
-          ) : items.length === 0 ? (
-            <div className="rounded-xl border border-dashed p-8 text-center text-muted-foreground">
-              <ListChecks className="h-8 w-8 mx-auto mb-2 opacity-60" />
-              Add your first grocery item or use AI Quick Add.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {groupedItems.liked.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Favorites</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="flex gap-2 overflow-x-auto pb-1">
-                      {groupedItems.liked.map((fav) => (
-                        <div key={`fav-${fav.id}`} className="shrink-0 rounded-lg border px-3 py-2 min-w-56 bg-background">
-                          <p className="text-sm font-medium truncate">{fav.name}</p>
-                          <div className="mt-1">
-                            <CategoryBadge category={getItemCategory(fav)} />
-                          </div>
-                          <p className="text-xs text-muted-foreground">{fav.quantity || "No quantity"}</p>
-                          <div className="mt-1">
-                            <AddedByBadge item={fav} />
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="mt-2 h-7 text-xs"
-                            onClick={async () => {
-                              const res = await fetch("/api/grocery", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ name: fav.name, quantity: fav.quantity }),
-                              });
-                              const created = await readJsonSafe<GroceryItem>(res);
-                              if (res.ok && created) {
-                                setItems((prev) => [created, ...prev]);
-                              }
-                            }}
-                          >
-                            Add Again
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+      <Tabs defaultValue="current" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="current">Current List</TabsTrigger>
+          <TabsTrigger value="history">Previous Shopping Trips</TabsTrigger>
+        </TabsList>
 
-              {(Object.keys(GROUP_LABELS) as GroceryGroupKey[]).map((groupKey) => {
-                const group = groupedItems[groupKey];
-                if (group.length === 0) return null;
-                return (
-                  <div
-                    key={groupKey}
-                    className={`space-y-2 rounded-xl p-1 transition-colors ${
-                      dragOverGroup === groupKey ? "bg-muted/40" : ""
-                    }`}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      if (dragOverGroup !== groupKey) setDragOverGroup(groupKey);
-                    }}
-                    onDragLeave={() => {
-                      if (dragOverGroup === groupKey) setDragOverGroup(null);
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const id = Number(e.dataTransfer.getData("text/plain") || draggingId);
-                      const item = items.find((it) => it.id === id);
-                      if (item) {
-                        moveItemToGroup(item, groupKey).catch(() => undefined);
-                      }
-                      setDragOverGroup(null);
-                      setDraggingId(null);
-                    }}
-                  >
-                    <div className="px-1">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                        {GROUP_LABELS[groupKey]} ({group.length})
-                      </p>
+        <TabsContent value="current" className="space-y-4">
+          {recentlyOrdered.length > 0 && (
+            <Card className="border-sky-200 bg-sky-50/60">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Recently Ordered</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {recentlyOrdered.map((recent) => (
+                    <div key={`recent-${recent.id}`} className="shrink-0 rounded-lg border px-3 py-2 min-w-56 bg-white">
+                      <div className="flex items-start gap-3">
+                        <GroceryThumb item={recent} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{recent.name}</p>
+                          <p className="text-xs text-muted-foreground">{recent.quantity || "No quantity"}</p>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            <CategoryBadge category={getItemCategory(recent)} />
+                            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                              <CalendarDays className="h-3 w-3" />
+                              {formatPurchasedAt(recent.purchased_at)}
+                            </span>
+                          </div>
+                          <div className="mt-1">
+                            <AddedByBadge item={recent} />
+                          </div>
+                        </div>
+                      </div>
+                      <Button size="sm" variant="outline" className="mt-2 h-7 text-xs" onClick={() => quickAddRecent(recent)}>
+                        Quick Add
+                      </Button>
                     </div>
-                    {group.map((item) => (
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className="border-0 shadow-none bg-transparent">
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="text-sm text-muted-foreground">Loading grocery items...</div>
+              ) : items.length === 0 ? (
+                <div className="rounded-xl border border-dashed p-8 text-center text-muted-foreground">
+                  <ListChecks className="h-8 w-8 mx-auto mb-2 opacity-60" />
+                  Main list is clear for the next trip. Add items or quick-add from recent orders above.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {groupedItems.liked.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Favorites</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {groupedItems.liked.map((fav) => (
+                            <div key={`fav-${fav.id}`} className="shrink-0 rounded-lg border px-3 py-2 min-w-56 bg-background">
+                              <p className="text-sm font-medium truncate">{fav.name}</p>
+                              <div className="mt-1">
+                                <CategoryBadge category={getItemCategory(fav)} />
+                              </div>
+                              <p className="text-xs text-muted-foreground">{fav.quantity || "No quantity"}</p>
+                              <div className="mt-1">
+                                <AddedByBadge item={fav} />
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="mt-2 h-7 text-xs"
+                                onClick={() => quickAddRecent(fav)}
+                              >
+                                Add Again
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {(Object.keys(GROUP_LABELS) as GroceryGroupKey[]).map((groupKey) => {
+                    const group = groupedItems[groupKey];
+                    if (group.length === 0) return null;
+                    return (
                       <div
-                        key={item.id}
-                        draggable
-                        onDragStart={(e) => {
-                          setDraggingId(item.id);
-                          e.dataTransfer.setData("text/plain", String(item.id));
+                        key={groupKey}
+                        className={`space-y-2 rounded-xl p-1 transition-colors ${
+                          dragOverGroup === groupKey ? "bg-muted/40" : ""
+                        }`}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          if (dragOverGroup !== groupKey) setDragOverGroup(groupKey);
                         }}
-                        onDragOver={(e) => e.preventDefault()}
+                        onDragLeave={() => {
+                          if (dragOverGroup === groupKey) setDragOverGroup(null);
+                        }}
                         onDrop={(e) => {
                           e.preventDefault();
-                          const sourceId = Number(e.dataTransfer.getData("text/plain") || draggingId);
-                          const source = items.find((it) => it.id === sourceId);
-                          if (!source || source.id === item.id) return;
-                          const sourceGroup = source.liked ? "liked" : source.category ?? inferGroup(source.name);
-                          if (sourceGroup === groupKey) {
-                            swapItemOrder(source, item).catch(() => undefined);
-                          } else {
-                            moveItemToGroup(source, groupKey).catch(() => undefined);
+                          const id = Number(e.dataTransfer.getData("text/plain") || draggingId);
+                          const item = items.find((it) => it.id === id);
+                          if (item) {
+                            moveItemToGroup(item, groupKey).catch(() => undefined);
                           }
                           setDragOverGroup(null);
                           setDraggingId(null);
                         }}
-                        onDragEnd={() => {
-                          setDraggingId(null);
-                          setDragOverGroup(null);
-                        }}
-                        className={`rounded-xl border p-3 flex items-center gap-3 ${
-                          item.checked ? "bg-green-50/50 border-green-200" : "bg-white"
-                        } ${draggingId === item.id ? "opacity-60" : ""}`}
                       >
-                        <div className="text-muted-foreground/70 shrink-0" title="Drag to reorder or move">
-                          <GripVertical className="h-4 w-4" />
-                        </div>
-                        <button type="button" onClick={() => toggleItem(item)} className="shrink-0">
-                          {item.checked ? (
-                            <CheckCircle2 className="h-5 w-5 text-green-600" />
-                          ) : (
-                            <Circle className="h-5 w-5 text-slate-500" />
-                          )}
-                        </button>
-                        <GroceryThumb item={item} />
-                        <div className="flex-1 min-w-0">
-                          <p className={`font-medium ${item.checked ? "line-through text-muted-foreground" : ""}`}>
-                            {item.name}
+                        <div className="px-1">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            {GROUP_LABELS[groupKey]} ({group.length})
                           </p>
-                          {editingId === item.id ? (
-                            <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                              <Input
-                                value={quantityDraft}
-                                onChange={(e) => setQuantityDraft(e.target.value)}
-                                placeholder="Quantity"
-                                className="h-8 text-xs max-w-[180px]"
-                              />
-                              <Select value={categoryDraft} onValueChange={(v) => setCategoryDraft(v as GroceryGroupKey)}>
-                                <SelectTrigger className="h-8 w-[170px] text-xs">
-                                  <SelectValue placeholder="Category" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {EDITABLE_CATEGORY_KEYS.map((key) => (
-                                    <SelectItem key={key} value={key}>
-                                      {GROUP_LABELS[key]}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <Button
-                                type="button"
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7"
-                                onClick={() => saveQuantity(item)}
-                                disabled={quantitySavingId === item.id}
-                                aria-label="Save quantity"
-                              >
-                                <Check className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                type="button"
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7"
-                                onClick={cancelEditQuantity}
-                                aria-label="Cancel editing quantity"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
-                              <CategoryBadge category={getItemCategory(item)} />
-                              <span>{item.quantity || "No quantity"} | {item.source}</span>
-                              <span>·</span>
-                              <AddedByBadge item={item} />
-                              <button
-                                type="button"
-                                onClick={() => startEditQuantity(item)}
-                                className="inline-flex items-center text-muted-foreground hover:text-foreground"
-                                aria-label="Edit quantity"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          )}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => toggleLiked(item)}
-                          className={`${item.liked ? "text-amber-500" : "text-muted-foreground"} hover:text-amber-500`}
-                          aria-label={item.liked ? "Unlike item" : "Like item"}
-                          title={item.liked ? "Unlike item" : "Like item"}
-                        >
-                          <Star className={`h-4 w-4 ${item.liked ? "fill-current" : ""}`} />
-                        </button>
-                        <button type="button" onClick={() => deleteItem(item.id)} className="text-muted-foreground hover:text-red-600">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {group.map((item) => (
+                          <div
+                            key={item.id}
+                            draggable
+                            onDragStart={(e) => {
+                              setDraggingId(item.id);
+                              e.dataTransfer.setData("text/plain", String(item.id));
+                            }}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              const sourceId = Number(e.dataTransfer.getData("text/plain") || draggingId);
+                              const source = items.find((it) => it.id === sourceId);
+                              if (!source || source.id === item.id) return;
+                              const sourceGroup = getItemCategory(source);
+                              if (sourceGroup === groupKey) {
+                                swapItemOrder(source, item).catch(() => undefined);
+                              } else {
+                                moveItemToGroup(source, groupKey).catch(() => undefined);
+                              }
+                              setDragOverGroup(null);
+                              setDraggingId(null);
+                            }}
+                            onDragEnd={() => {
+                              setDraggingId(null);
+                              setDragOverGroup(null);
+                            }}
+                            className={`rounded-xl border p-3 flex items-center gap-3 bg-white ${draggingId === item.id ? "opacity-60" : ""}`}
+                          >
+                            <div className="text-muted-foreground/70 shrink-0" title="Drag to reorder or move">
+                              <GripVertical className="h-4 w-4" />
+                            </div>
+                            <button type="button" onClick={() => toggleItem(item)} className="shrink-0" title="Mark purchased">
+                              <Circle className="h-5 w-5 text-slate-500" />
+                            </button>
+                            <GroceryThumb item={item} />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium">{item.name}</p>
+                              {editingId === item.id ? (
+                                <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                  <Input
+                                    value={quantityDraft}
+                                    onChange={(e) => setQuantityDraft(e.target.value)}
+                                    placeholder="Quantity"
+                                    className="h-8 text-xs max-w-[180px]"
+                                  />
+                                  <Select value={categoryDraft} onValueChange={(v) => setCategoryDraft(v as GroceryGroupKey)}>
+                                    <SelectTrigger className="h-8 w-[170px] text-xs">
+                                      <SelectValue placeholder="Category" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {EDITABLE_CATEGORY_KEYS.map((key) => (
+                                        <SelectItem key={key} value={key}>
+                                          {GROUP_LABELS[key]}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7"
+                                    onClick={() => saveQuantity(item)}
+                                    disabled={quantitySavingId === item.id}
+                                    aria-label="Save quantity"
+                                  >
+                                    <Check className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7"
+                                    onClick={cancelEditQuantity}
+                                    aria-label="Cancel editing quantity"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                                  <CategoryBadge category={getItemCategory(item)} />
+                                  <span>{item.quantity || "No quantity"} | {item.source}</span>
+                                  <span>&middot;</span>
+                                  <AddedByBadge item={item} />
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditQuantity(item)}
+                                    className="inline-flex items-center text-muted-foreground hover:text-foreground"
+                                    aria-label="Edit quantity"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleLiked(item)}
+                              className={`${item.liked ? "text-amber-500" : "text-muted-foreground"} hover:text-amber-500`}
+                              aria-label={item.liked ? "Unlike item" : "Like item"}
+                              title={item.liked ? "Unlike item" : "Like item"}
+                            >
+                              <Star className={`h-4 w-4 ${item.liked ? "fill-current" : ""}`} />
+                            </button>
+                            <button type="button" onClick={() => deleteItem(item.id)} className="text-muted-foreground hover:text-red-600">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="history">
+          <Card className="border-0 shadow-none bg-transparent">
+            <CardContent className="p-0">
+              {previousTrips.length === 0 ? (
+                <div className="rounded-xl border border-dashed p-8 text-center text-muted-foreground">
+                  <History className="h-8 w-8 mx-auto mb-2 opacity-60" />
+                  Purchased items will collect here as dated shopping trips.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {previousTrips.map((trip) => (
+                    <Card key={trip.id}>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <CalendarDays className="h-4 w-4 text-sky-600" />
+                          {formatTripDate(trip.completed_on)}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2 pt-0">
+                        {trip.items.map((item) => (
+                          <div key={`${trip.id}-${item.id}`} className="rounded-xl border bg-white p-3 flex items-center gap-3">
+                            <GroceryThumb item={item} />
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium">{item.name}</p>
+                              <div className="mt-1 flex items-center gap-1.5 flex-wrap text-xs text-muted-foreground">
+                                <CategoryBadge category={getItemCategory(item)} />
+                                <span>{item.quantity || "No quantity"} | {item.source}</span>
+                                <span>&middot;</span>
+                                <AddedByBadge item={item} />
+                                <span className="inline-flex items-center gap-1">
+                                  <CalendarDays className="h-3 w-3" />
+                                  {formatPurchasedAt(item.purchased_at)}
+                                </span>
+                              </div>
+                            </div>
+                            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => quickAddRecent(item)}>
+                              Add Again
+                            </Button>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

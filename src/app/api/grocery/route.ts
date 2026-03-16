@@ -1,33 +1,7 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { requireUserId } from "@/lib/route-auth";
-
-const GROCERY_ITEM_SELECT = sql`
-  grocery_items.id,
-  grocery_items.user_id,
-  grocery_items.family_id,
-  grocery_items.name,
-  grocery_items.quantity,
-  grocery_items.liked,
-  grocery_items.category,
-  grocery_items.sort_order,
-  grocery_items.checked,
-  grocery_items.source,
-  grocery_items.recipe_id,
-  grocery_items.image_url,
-  grocery_items.image_lookup_attempted_at::text,
-  grocery_items.created_at::text,
-  NULLIF(
-    TRIM(
-      CONCAT(
-        COALESCE(user_profiles.first_name, ''),
-        ' ',
-        COALESCE(user_profiles.last_name, '')
-      )
-    ),
-    ''
-  ) AS added_by_name
-`;
+import { ensureGrocerySchema, GROCERY_ITEM_SELECT, resolveGroceryFamilyId } from "@/lib/grocery";
 
 function normalizeIngredientLines(raw: string): Array<{ name: string; quantity: string | null }> {
   return raw
@@ -41,91 +15,13 @@ function normalizeIngredientLines(raw: string): Array<{ name: string; quantity: 
     });
 }
 
-async function ensureGroceryTable() {
-  await sql`
-    CREATE TABLE IF NOT EXISTS family_groups (
-      id          SERIAL PRIMARY KEY,
-      owner_id    INTEGER NOT NULL,
-      name        TEXT NOT NULL DEFAULT 'My Family',
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
-  await sql`
-    CREATE TABLE IF NOT EXISTS family_memberships (
-      id          SERIAL PRIMARY KEY,
-      family_id   INTEGER NOT NULL REFERENCES family_groups(id) ON DELETE CASCADE,
-      user_id     INTEGER NOT NULL,
-      circle      TEXT NOT NULL CHECK (circle IN ('family', 'extended')),
-      role        TEXT NOT NULL DEFAULT 'member',
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE(family_id, user_id)
-    )
-  `;
-  await sql`
-    CREATE TABLE IF NOT EXISTS grocery_items (
-      id          SERIAL PRIMARY KEY,
-      user_id     INTEGER NOT NULL,
-      family_id   INTEGER,
-      name        TEXT NOT NULL,
-      quantity    TEXT,
-      liked       BOOLEAN NOT NULL DEFAULT FALSE,
-      category    TEXT,
-      sort_order  INTEGER NOT NULL DEFAULT 0,
-      checked     BOOLEAN NOT NULL DEFAULT FALSE,
-      source      TEXT NOT NULL DEFAULT 'manual',
-      recipe_id   INTEGER,
-      image_url   TEXT,
-      image_lookup_attempted_at TIMESTAMPTZ,
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
-  await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS liked BOOLEAN NOT NULL DEFAULT FALSE`;
-  await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS category TEXT`;
-  await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0`;
-  await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS family_id INTEGER`;
-  await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS image_url TEXT`;
-  await sql`ALTER TABLE grocery_items ADD COLUMN IF NOT EXISTS image_lookup_attempted_at TIMESTAMPTZ`;
-  await sql`
-    CREATE INDEX IF NOT EXISTS idx_grocery_items_user_checked_created
-      ON grocery_items (user_id, checked, created_at DESC)
-  `;
-  await sql`
-    CREATE INDEX IF NOT EXISTS idx_grocery_items_family_checked_created
-      ON grocery_items (family_id, checked, created_at DESC)
-  `;
-}
-
-async function resolveGroceryFamilyId(userId: number): Promise<number> {
-  const [member] = await sql`
-    SELECT family_id
-    FROM family_memberships
-    WHERE user_id = ${userId}
-    ORDER BY (role = 'owner') ASC, created_at DESC
-    LIMIT 1
-  `;
-  if (member?.family_id) return Number(member.family_id);
-
-  const [createdFamily] = await sql`
-    INSERT INTO family_groups (owner_id, name)
-    VALUES (${userId}, 'My Family')
-    RETURNING id
-  `;
-  const familyId = Number(createdFamily.id);
-  await sql`
-    INSERT INTO family_memberships (family_id, user_id, circle, role)
-    VALUES (${familyId}, ${userId}, 'family', 'owner')
-    ON CONFLICT (family_id, user_id) DO NOTHING
-  `;
-  return familyId;
-}
-
 export async function GET(req: Request) {
   const authState = await requireUserId(req);
   if ("response" in authState) return authState.response;
   const { userId } = authState;
 
   try {
-    await ensureGroceryTable();
+    await ensureGrocerySchema();
     const familyId = await resolveGroceryFamilyId(userId);
     await sql`
       UPDATE grocery_items
@@ -138,7 +34,8 @@ export async function GET(req: Request) {
       FROM grocery_items
       LEFT JOIN user_profiles ON user_profiles.id = grocery_items.user_id
       WHERE grocery_items.family_id = ${familyId}
-      ORDER BY checked ASC, sort_order ASC, created_at DESC
+        AND grocery_items.checked = FALSE
+      ORDER BY sort_order ASC, created_at DESC
     `;
     const participants = await sql`
       SELECT
@@ -168,10 +65,112 @@ export async function GET(req: Request) {
       WHERE id = ${familyId}
       LIMIT 1
     `;
+    const tripRows = await sql`
+      WITH recent_trips AS (
+        SELECT id, completed_on, created_at
+        FROM grocery_trips
+        WHERE family_id = ${familyId}
+        ORDER BY completed_on DESC, id DESC
+        LIMIT 12
+      )
+      SELECT
+        recent_trips.id AS trip_id,
+        recent_trips.completed_on::text,
+        recent_trips.created_at::text AS trip_created_at,
+        grocery_trip_items.id,
+        grocery_trip_items.family_id,
+        grocery_trip_items.user_id,
+        grocery_trip_items.name,
+        grocery_trip_items.quantity,
+        grocery_trip_items.liked,
+        grocery_trip_items.category,
+        grocery_trip_items.source,
+        grocery_trip_items.recipe_id,
+        grocery_trip_items.image_url,
+        grocery_trip_items.purchased_at::text,
+        NULLIF(
+          TRIM(
+            CONCAT(
+              COALESCE(user_profiles.first_name, ''),
+              ' ',
+              COALESCE(user_profiles.last_name, '')
+            )
+          ),
+          ''
+        ) AS added_by_name
+      FROM recent_trips
+      JOIN grocery_trip_items ON grocery_trip_items.trip_id = recent_trips.id
+      LEFT JOIN user_profiles ON user_profiles.id = grocery_trip_items.user_id
+      ORDER BY recent_trips.completed_on DESC, grocery_trip_items.purchased_at DESC, grocery_trip_items.id DESC
+    `;
+    const previousTrips = tripRows.reduce<Array<Record<string, unknown>>>((acc, row) => {
+      const tripId = Number(row.trip_id);
+      const existing = acc.find((entry) => Number(entry.id) === tripId);
+      const item = {
+        id: Number(row.id),
+        family_id: Number(row.family_id),
+        user_id: Number(row.user_id),
+        name: row.name,
+        quantity: row.quantity,
+        liked: Boolean(row.liked),
+        category: row.category,
+        source: row.source,
+        recipe_id: row.recipe_id,
+        image_url: row.image_url,
+        purchased_at: row.purchased_at,
+        added_by_name: row.added_by_name,
+      };
+      if (existing) {
+        (existing.items as Array<Record<string, unknown>>).push(item);
+        return acc;
+      }
+      acc.push({
+        id: tripId,
+        completed_on: row.completed_on,
+        created_at: row.trip_created_at,
+        items: [item],
+      });
+      return acc;
+    }, []);
+    const recentlyOrdered = await sql`
+      SELECT *
+      FROM (
+        SELECT DISTINCT ON (LOWER(name))
+          grocery_trip_items.id,
+          grocery_trip_items.family_id,
+          grocery_trip_items.user_id,
+          grocery_trip_items.name,
+          grocery_trip_items.quantity,
+          grocery_trip_items.liked,
+          grocery_trip_items.category,
+          grocery_trip_items.source,
+          grocery_trip_items.recipe_id,
+          grocery_trip_items.image_url,
+          grocery_trip_items.purchased_at::text,
+          NULLIF(
+            TRIM(
+              CONCAT(
+                COALESCE(user_profiles.first_name, ''),
+                ' ',
+                COALESCE(user_profiles.last_name, '')
+              )
+            ),
+            ''
+          ) AS added_by_name
+        FROM grocery_trip_items
+        LEFT JOIN user_profiles ON user_profiles.id = grocery_trip_items.user_id
+        WHERE grocery_trip_items.family_id = ${familyId}
+        ORDER BY LOWER(name), purchased_at DESC
+      ) recent
+      ORDER BY purchased_at DESC
+      LIMIT 12
+    `;
     return NextResponse.json({
       items,
       participants,
       family: family ?? { id: familyId, name: "My Family" },
+      previous_trips: previousTrips,
+      recently_ordered: recentlyOrdered,
     });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
@@ -184,7 +183,7 @@ export async function POST(req: Request) {
   const { userId } = authState;
 
   try {
-    await ensureGroceryTable();
+    await ensureGrocerySchema();
     const familyId = await resolveGroceryFamilyId(userId);
     await sql`
       UPDATE grocery_items
