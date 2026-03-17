@@ -59,9 +59,10 @@ function sumMacros(entries: FoodLogEntry[]): DailyMacroTotals {
       carbs_g: acc.carbs_g + Number(e.carbs_g),
       fat_g: acc.fat_g + Number(e.fat_g),
       fiber_g: acc.fiber_g + Number(e.fiber_g),
+      sugar_g: acc.sugar_g + Number(e.sugar_g ?? 0),
       sodium_mg: acc.sodium_mg + Number(e.sodium_mg),
     }),
-    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sodium_mg: 0 }
+    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sugar_g: 0, sodium_mg: 0 }
   );
 }
 
@@ -155,6 +156,7 @@ export default function DashboardPage() {
     carbs_goal_g: String(DEFAULT_MACRO_GOALS.carbs_g),
     fat_goal_g: String(DEFAULT_MACRO_GOALS.fat_g),
     fiber_goal_g: String(DEFAULT_MACRO_GOALS.fiber_g),
+    sugar_goal_g: String(DEFAULT_MACRO_GOALS.sugar_g),
     sodium_goal_mg: String(DEFAULT_MACRO_GOALS.sodium_mg),
   });
 
@@ -205,6 +207,7 @@ export default function DashboardPage() {
           carbs_goal_g: String(goals.carbs_g),
           fat_goal_g: String(goals.fat_g),
           fiber_goal_g: String(goals.fiber_g),
+          sugar_goal_g: String(goals.sugar_g),
           sodium_goal_mg: String(goals.sodium_mg),
           height_in: p.height_in != null ? String(p.height_in) : prev.height_in,
           goal_weight_lbs: p.goal_weight_lbs != null ? String(p.goal_weight_lbs) : prev.goal_weight_lbs,
@@ -278,6 +281,7 @@ export default function DashboardPage() {
           carbs_goal_g: toNumberOrNull(onboardingForm.carbs_goal_g),
           fat_goal_g: toNumberOrNull(onboardingForm.fat_goal_g),
           fiber_goal_g: toNumberOrNull(onboardingForm.fiber_goal_g),
+          sugar_goal_g: toNumberOrNull(onboardingForm.sugar_goal_g),
           sodium_goal_mg: toNumberOrNull(onboardingForm.sodium_goal_mg),
           height_in: toNumberOrNull(onboardingForm.height_in),
           goal_weight_lbs: toNumberOrNull(onboardingForm.goal_weight_lbs),
@@ -313,6 +317,7 @@ export default function DashboardPage() {
         carbs_g: toNumberOrNull(onboardingForm.carbs_goal_g) ?? DEFAULT_MACRO_GOALS.carbs_g,
         fat_g: toNumberOrNull(onboardingForm.fat_goal_g) ?? DEFAULT_MACRO_GOALS.fat_g,
         fiber_g: toNumberOrNull(onboardingForm.fiber_goal_g) ?? DEFAULT_MACRO_GOALS.fiber_g,
+        sugar_g: toNumberOrNull(onboardingForm.sugar_goal_g) ?? DEFAULT_MACRO_GOALS.sugar_g,
         sodium_mg: toNumberOrNull(onboardingForm.sodium_goal_mg) ?? DEFAULT_MACRO_GOALS.sodium_mg,
       });
       setOnboardingOpen(false);
