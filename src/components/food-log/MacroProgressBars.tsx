@@ -79,6 +79,13 @@ export function MacroProgressBars({ totals, goals = DEFAULT_MACRO_GOALS }: Props
         color="bg-green-500"
       />
       <MacroRow
+        label="Sugar"
+        value={totals.sugar_g}
+        goal={goals.sugar_g}
+        unit="g"
+        color="bg-pink-500"
+      />
+      <MacroRow
         label="Sodium"
         value={totals.sodium_mg}
         goal={goals.sodium_mg}

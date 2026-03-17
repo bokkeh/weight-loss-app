@@ -25,7 +25,7 @@ export async function PATCH(
     const targetId = Number(id);
     const [existing] = await sql`
       SELECT id, logged_at::text, meal_type, display_order::float, food_name, serving_size,
-             calories::float, protein_g::float, carbs_g::float, fat_g::float, fiber_g::float, sodium_mg::float,
+             calories::float, protein_g::float, carbs_g::float, fat_g::float, fiber_g::float, sugar_g::float, sodium_mg::float,
              source, recipe_id, created_at::text
       FROM food_log_entries
       WHERE id = ${targetId}
@@ -52,6 +52,7 @@ export async function PATCH(
     const nextCarbs = has("carbs_g") ? Number(body.carbs_g ?? 0) : Number(existing.carbs_g);
     const nextFat = has("fat_g") ? Number(body.fat_g ?? 0) : Number(existing.fat_g);
     const nextFiber = has("fiber_g") ? Number(body.fiber_g ?? 0) : Number(existing.fiber_g);
+    const nextSugar = has("sugar_g") ? Number(body.sugar_g ?? 0) : Number(existing.sugar_g ?? 0);
     const nextSodium = has("sodium_mg") ? Number(body.sodium_mg ?? 0) : Number(existing.sodium_mg);
 
     const [entry] = await sql`
@@ -65,12 +66,13 @@ export async function PATCH(
           carbs_g    = ${nextCarbs},
           fat_g      = ${nextFat},
           fiber_g    = ${nextFiber},
+          sugar_g    = ${nextSugar},
           sodium_mg  = ${nextSodium}
       WHERE id = ${targetId}
         AND user_id = ${userId}
       RETURNING id, logged_at::text, meal_type, display_order::float, food_name, serving_size,
                 calories::float, protein_g::float, carbs_g::float, fat_g::float,
-                fiber_g::float, sodium_mg::float, source, recipe_id, created_at::text
+                fiber_g::float, sugar_g::float, sodium_mg::float, source, recipe_id, created_at::text
     `;
     if (!entry) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json(entry);

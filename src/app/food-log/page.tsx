@@ -46,9 +46,10 @@ function sumMacros(entries: FoodLogEntry[]): DailyMacroTotals {
       carbs_g: acc.carbs_g + Number(e.carbs_g),
       fat_g: acc.fat_g + Number(e.fat_g),
       fiber_g: acc.fiber_g + Number(e.fiber_g),
+      sugar_g: acc.sugar_g + Number(e.sugar_g ?? 0),
       sodium_mg: acc.sodium_mg + Number(e.sodium_mg),
     }),
-    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sodium_mg: 0 }
+    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sugar_g: 0, sodium_mg: 0 }
   );
 }
 
@@ -79,7 +80,7 @@ function buildShareText(entries: FoodLogEntry[], date: Date, goals: MacroGoals):
 
   const totals = sumMacros(entries);
   lines.push("ðŸ“ˆ Daily Totals");
-  lines.push(`Calories: ${totals.calories.toFixed(0)} / ${goals.calories} | Protein: ${totals.protein_g.toFixed(1)}g / ${goals.protein_g}g | Carbs: ${totals.carbs_g.toFixed(1)}g / ${goals.carbs_g}g | Fat: ${totals.fat_g.toFixed(1)}g / ${goals.fat_g}g | Fiber: ${totals.fiber_g.toFixed(1)}g / ${goals.fiber_g}g | Sodium: ${totals.sodium_mg.toFixed(0)}mg / ${goals.sodium_mg}mg`);
+  lines.push(`Calories: ${totals.calories.toFixed(0)} / ${goals.calories} | Protein: ${totals.protein_g.toFixed(1)}g / ${goals.protein_g}g | Carbs: ${totals.carbs_g.toFixed(1)}g / ${goals.carbs_g}g | Fat: ${totals.fat_g.toFixed(1)}g / ${goals.fat_g}g | Fiber: ${totals.fiber_g.toFixed(1)}g / ${goals.fiber_g}g | Sugar: ${totals.sugar_g.toFixed(1)}g / ${goals.sugar_g}g | Sodium: ${totals.sodium_mg.toFixed(0)}mg / ${goals.sodium_mg}mg`);
 
   return lines.join("\n");
 }
@@ -159,7 +160,7 @@ async function buildFoodLogSnapshotImage(entries: FoodLogEntry[], date: Date, go
   ctx.font = "500 24px Arial";
   ctx.fillText(`Calories ${totals.calories.toFixed(0)} / ${goals.calories.toFixed(0)} kcal`, 80, totalsTop + 82);
   ctx.fillText(`Protein ${totals.protein_g.toFixed(0)}g | Carbs ${totals.carbs_g.toFixed(0)}g | Fat ${totals.fat_g.toFixed(0)}g`, 80, totalsTop + 114);
-  ctx.fillText(`Fiber ${totals.fiber_g.toFixed(0)}g | Sodium ${totals.sodium_mg.toFixed(0)}mg`, 80, totalsTop + 144);
+  ctx.fillText(`Fiber ${totals.fiber_g.toFixed(0)}g | Sugar ${totals.sugar_g.toFixed(0)}g | Sodium ${totals.sodium_mg.toFixed(0)}mg`, 80, totalsTop + 144);
 
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
   if (!blob) throw new Error("Failed to build day snapshot.");

@@ -29,6 +29,7 @@ const emptyForm = {
   carbs_g: "",
   fat_g: "",
   fiber_g: "",
+  sugar_g: "",
   sodium_mg: "",
 };
 
@@ -59,6 +60,7 @@ export function FoodEntryForm({ date, onAdded }: Props) {
           carbs_g: parseFloat(form.carbs_g) || 0,
           fat_g: parseFloat(form.fat_g) || 0,
           fiber_g: parseFloat(form.fiber_g) || 0,
+          sugar_g: parseFloat(form.sugar_g) || 0,
           sodium_mg: parseFloat(form.sodium_mg) || 0,
         }),
       });
@@ -172,6 +174,18 @@ export function FoodEntryForm({ date, onAdded }: Props) {
             placeholder="g"
             value={form.fiber_g}
             onChange={(e) => setField("fiber_g", e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="sugar">Sugar (g)</Label>
+          <Input
+            id="sugar"
+            type="number"
+            min="0"
+            step="0.1"
+            placeholder="g"
+            value={form.sugar_g}
+            onChange={(e) => setField("sugar_g", e.target.value)}
           />
         </div>
         <div className="space-y-1">

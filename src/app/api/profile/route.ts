@@ -33,6 +33,7 @@ async function ensureProfileTable() {
     await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS carbs_goal_g NUMERIC`;
     await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fat_goal_g NUMERIC`;
     await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fiber_goal_g NUMERIC`;
+    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS sugar_goal_g NUMERIC`;
     await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS sodium_goal_mg NUMERIC`;
     await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS height_in NUMERIC`;
     await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS goal_weight_lbs NUMERIC`;
@@ -59,7 +60,7 @@ export async function GET(req: Request) {
       SELECT
         id, first_name, last_name, email, phone, profile_image_url, account_type, dietary_restrictions,
         calorie_goal::float, protein_goal_g::float, carbs_goal_g::float, fat_goal_g::float,
-        fiber_goal_g::float, sodium_goal_mg::float, height_in::float, goal_weight_lbs::float,
+        fiber_goal_g::float, sugar_goal_g::float, sodium_goal_mg::float, height_in::float, goal_weight_lbs::float,
         onboarding_completed,
         created_at::text, updated_at::text
       FROM user_profiles
@@ -74,7 +75,7 @@ export async function GET(req: Request) {
       RETURNING
         id, first_name, last_name, email, phone, profile_image_url, account_type, dietary_restrictions,
         calorie_goal::float, protein_goal_g::float, carbs_goal_g::float, fat_goal_g::float,
-        fiber_goal_g::float, sodium_goal_mg::float, height_in::float, goal_weight_lbs::float,
+        fiber_goal_g::float, sugar_goal_g::float, sodium_goal_mg::float, height_in::float, goal_weight_lbs::float,
         onboarding_completed,
         created_at::text, updated_at::text
     `;
@@ -105,6 +106,7 @@ export async function PUT(req: Request) {
       carbs_goal_g,
       fat_goal_g,
       fiber_goal_g,
+      sugar_goal_g,
       sodium_goal_mg,
       height_in,
       goal_weight_lbs,
@@ -123,7 +125,7 @@ export async function PUT(req: Request) {
     const [profile] = await sql`
       INSERT INTO user_profiles (
         id, first_name, last_name, email, phone, dietary_restrictions, profile_image_url, account_type,
-        calorie_goal, protein_goal_g, carbs_goal_g, fat_goal_g, fiber_goal_g, sodium_goal_mg,
+        calorie_goal, protein_goal_g, carbs_goal_g, fat_goal_g, fiber_goal_g, sugar_goal_g, sodium_goal_mg,
         height_in, goal_weight_lbs, onboarding_completed
       )
       VALUES (
@@ -140,6 +142,7 @@ export async function PUT(req: Request) {
         ${parseNumeric(carbs_goal_g)},
         ${parseNumeric(fat_goal_g)},
         ${parseNumeric(fiber_goal_g)},
+        ${parseNumeric(sugar_goal_g)},
         ${parseNumeric(sodium_goal_mg)},
         ${parseNumeric(height_in)},
         ${parseNumeric(goal_weight_lbs)},
@@ -158,6 +161,7 @@ export async function PUT(req: Request) {
         carbs_goal_g = COALESCE(${parseNumeric(carbs_goal_g)}, user_profiles.carbs_goal_g),
         fat_goal_g = COALESCE(${parseNumeric(fat_goal_g)}, user_profiles.fat_goal_g),
         fiber_goal_g = COALESCE(${parseNumeric(fiber_goal_g)}, user_profiles.fiber_goal_g),
+        sugar_goal_g = COALESCE(${parseNumeric(sugar_goal_g)}, user_profiles.sugar_goal_g),
         sodium_goal_mg = COALESCE(${parseNumeric(sodium_goal_mg)}, user_profiles.sodium_goal_mg),
         height_in = COALESCE(${parseNumeric(height_in)}, user_profiles.height_in),
         goal_weight_lbs = COALESCE(${parseNumeric(goal_weight_lbs)}, user_profiles.goal_weight_lbs),
@@ -168,7 +172,7 @@ export async function PUT(req: Request) {
       RETURNING
         id, first_name, last_name, email, phone, profile_image_url, account_type, dietary_restrictions,
         calorie_goal::float, protein_goal_g::float, carbs_goal_g::float, fat_goal_g::float,
-        fiber_goal_g::float, sodium_goal_mg::float, height_in::float, goal_weight_lbs::float,
+        fiber_goal_g::float, sugar_goal_g::float, sodium_goal_mg::float, height_in::float, goal_weight_lbs::float,
         onboarding_completed,
         created_at::text, updated_at::text
     `;

@@ -21,6 +21,7 @@ interface ProfileForm {
   carbs_goal_g: string;
   fat_goal_g: string;
   fiber_goal_g: string;
+  sugar_goal_g: string;
   sodium_goal_mg: string;
   height_in: string;
   goal_weight_lbs: string;
@@ -39,6 +40,7 @@ export default function ProfilePage() {
     carbs_goal_g: "170",
     fat_goal_g: "75",
     fiber_goal_g: "30",
+    sugar_goal_g: "50",
     sodium_goal_mg: "2300",
     height_in: "",
     goal_weight_lbs: "",
@@ -78,6 +80,7 @@ export default function ProfilePage() {
           carbs_goal_g: profile.carbs_goal_g != null ? String(profile.carbs_goal_g) : "170",
           fat_goal_g: profile.fat_goal_g != null ? String(profile.fat_goal_g) : "75",
           fiber_goal_g: profile.fiber_goal_g != null ? String(profile.fiber_goal_g) : "30",
+          sugar_goal_g: profile.sugar_goal_g != null ? String(profile.sugar_goal_g) : "50",
           sodium_goal_mg: profile.sodium_goal_mg != null ? String(profile.sodium_goal_mg) : "2300",
           height_in: profile.height_in != null ? String(profile.height_in) : "",
           goal_weight_lbs: profile.goal_weight_lbs != null ? String(profile.goal_weight_lbs) : "",
@@ -140,6 +143,7 @@ export default function ProfilePage() {
           carbs_goal_g: form.carbs_goal_g ? Number(form.carbs_goal_g) : null,
           fat_goal_g: form.fat_goal_g ? Number(form.fat_goal_g) : null,
           fiber_goal_g: form.fiber_goal_g ? Number(form.fiber_goal_g) : null,
+          sugar_goal_g: form.sugar_goal_g ? Number(form.sugar_goal_g) : null,
           sodium_goal_mg: form.sodium_goal_mg ? Number(form.sodium_goal_mg) : null,
           height_in: form.height_in ? Number(form.height_in) : null,
           goal_weight_lbs: form.goal_weight_lbs ? Number(form.goal_weight_lbs) : null,
@@ -243,6 +247,10 @@ export default function ProfilePage() {
                 <div className="space-y-1">
                   <Label htmlFor="fiber_goal_g">Fiber (g)</Label>
                   <Input id="fiber_goal_g" type="number" min={1} value={form.fiber_goal_g} onChange={(e) => setField("fiber_goal_g", e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="sugar_goal_g">Sugar (g)</Label>
+                  <Input id="sugar_goal_g" type="number" min={1} value={form.sugar_goal_g} onChange={(e) => setField("sugar_goal_g", e.target.value)} />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="sodium_goal_mg">Sodium (mg)</Label>

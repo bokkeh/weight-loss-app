@@ -38,9 +38,10 @@ function sumMacros(entries: FoodLogEntry[]): DailyMacroTotals {
       carbs_g: acc.carbs_g + Number(e.carbs_g),
       fat_g: acc.fat_g + Number(e.fat_g),
       fiber_g: acc.fiber_g + Number(e.fiber_g),
+      sugar_g: acc.sugar_g + Number(e.sugar_g ?? 0),
       sodium_mg: acc.sodium_mg + Number(e.sodium_mg),
     }),
-    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sodium_mg: 0 }
+    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sugar_g: 0, sodium_mg: 0 }
   );
 }
 
@@ -53,6 +54,7 @@ interface EditForm {
   carbs_g: string;
   fat_g: string;
   fiber_g: string;
+  sugar_g: string;
   sodium_mg: string;
 }
 
@@ -66,6 +68,7 @@ function toEditForm(e: FoodLogEntry): EditForm {
     carbs_g: String(Number(e.carbs_g).toFixed(1)),
     fat_g: String(Number(e.fat_g).toFixed(1)),
     fiber_g: String(Number(e.fiber_g).toFixed(1)),
+    sugar_g: String(Number(e.sugar_g ?? 0).toFixed(1)),
     sodium_mg: String(Number(e.sodium_mg ?? 0).toFixed(0)),
   };
 }
@@ -107,6 +110,7 @@ function InlineEditForm({
           carbs_g: parseFloat(form.carbs_g) || 0,
           fat_g: parseFloat(form.fat_g) || 0,
           fiber_g: parseFloat(form.fiber_g) || 0,
+          sugar_g: parseFloat(form.sugar_g) || 0,
           sodium_mg: parseFloat(form.sodium_mg) || 0,
         }),
       });
@@ -181,6 +185,13 @@ function InlineEditForm({
           type="number" min="0" step="0.1"
           value={form.fiber_g}
           onChange={(e) => setField("fiber_g", e.target.value)}
+          className="h-8 text-sm"
+        />
+        <Input
+          placeholder="Sugar (g)"
+          type="number" min="0" step="0.1"
+          value={form.sugar_g}
+          onChange={(e) => setField("sugar_g", e.target.value)}
           className="h-8 text-sm"
         />
         <Input
@@ -400,6 +411,9 @@ export function FoodLogTable({ entries, onDelete, onUpdated, onReordered }: Prop
                         {Number(entry.fiber_g) > 0 && (
                           <span className="text-xs font-mono text-green-600">{Number(entry.fiber_g).toFixed(1)}g Fiber</span>
                         )}
+                        {Number(entry.sugar_g ?? 0) > 0 && (
+                          <span className="text-xs font-mono text-pink-600">{Number(entry.sugar_g).toFixed(1)}g Sugar</span>
+                        )}
                       </div>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">{formatEntryTimestamp(entry)}</p>
                     </div>
@@ -440,6 +454,7 @@ export function FoodLogTable({ entries, onDelete, onUpdated, onReordered }: Prop
             <span className="text-yellow-600">C: {totals.carbs_g.toFixed(1)}g</span>
             <span className="text-red-600">F: {totals.fat_g.toFixed(1)}g</span>
             <span className="text-green-600">Fiber: {totals.fiber_g.toFixed(1)}g</span>
+            <span className="text-pink-600">Sugar: {totals.sugar_g.toFixed(1)}g</span>
             <span className="text-cyan-600">Na: {totals.sodium_mg.toFixed(0)}mg</span>
           </div>
         </div>

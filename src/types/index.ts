@@ -19,6 +19,7 @@ export interface FoodLogEntry {
   carbs_g: number;
   fat_g: number;
   fiber_g: number;
+  sugar_g: number;
   sodium_mg: number;
   source: "manual" | "ai_chat" | "recipe";
   recipe_id?: number;
@@ -35,6 +36,7 @@ export interface Recipe {
   carbs_g: number;
   fat_g: number;
   fiber_g: number;
+  sugar_g: number;
   ingredients?: string;
   instructions?: string;
   image_url?: string;
@@ -65,6 +67,7 @@ export interface UserProfile {
   carbs_goal_g?: number;
   fat_goal_g?: number;
   fiber_goal_g?: number;
+  sugar_goal_g?: number;
   sodium_goal_mg?: number;
   height_in?: number;
   goal_weight_lbs?: number;
@@ -87,5 +90,6 @@ export interface DailyMacroTotals {
   carbs_g: number;
   fat_g: number;
   fiber_g: number;
+  sugar_g: number;
   sodium_mg: number;
 }

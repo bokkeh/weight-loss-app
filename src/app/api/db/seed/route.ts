@@ -82,6 +82,18 @@ export async function POST(req: Request) {
         ADD COLUMN IF NOT EXISTS sodium_mg NUMERIC(7,1) NOT NULL DEFAULT 0
     `;
 
+    // Migration: add sugar_g column
+    await sql`
+      ALTER TABLE food_log_entries
+        ADD COLUMN IF NOT EXISTS sugar_g NUMERIC(6,2) NOT NULL DEFAULT 0
+    `;
+
+    // Migration: add sugar_g to recipes
+    await sql`
+      ALTER TABLE recipes
+        ADD COLUMN IF NOT EXISTS sugar_g NUMERIC(6,2) NOT NULL DEFAULT 0
+    `;
+
     await sql`
       CREATE TABLE IF NOT EXISTS chat_messages (
         id           SERIAL PRIMARY KEY,
@@ -197,6 +209,7 @@ export async function POST(req: Request) {
     await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fat_goal_g NUMERIC`;
     await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fiber_goal_g NUMERIC`;
     await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS sodium_goal_mg NUMERIC`;
+    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS sugar_goal_g NUMERIC`;
     await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS height_in NUMERIC`;
     await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS goal_weight_lbs NUMERIC`;
     await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE`;
