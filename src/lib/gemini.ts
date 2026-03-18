@@ -60,6 +60,31 @@ export interface VisionImageInput {
   mimeType: string;
 }
 
+function sanitizeFoodLogPayload(payload: FoodLogPayload): FoodLogPayload {
+  const toFinite = (value: unknown) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : 0;
+  };
+
+  const carbs = Math.max(0, toFinite(payload.carbs_g));
+  const fiber = Math.max(0, toFinite(payload.fiber_g));
+  const sugar = Math.max(0, Math.min(toFinite(payload.sugar_g), carbs));
+  const validMealTypes = ["breakfast", "lunch", "dinner", "snack"] as const;
+
+  return {
+    food_name: String(payload.food_name ?? "").trim(),
+    serving_size: payload.serving_size ? String(payload.serving_size).trim() : undefined,
+    calories: Math.max(0, toFinite(payload.calories)),
+    protein_g: Math.max(0, toFinite(payload.protein_g)),
+    carbs_g: carbs,
+    fat_g: Math.max(0, toFinite(payload.fat_g)),
+    fiber_g: Math.min(fiber, carbs),
+    sugar_g: sugar,
+    sodium_mg: Math.max(0, toFinite(payload.sodium_mg)),
+    meal_type: validMealTypes.includes(payload.meal_type) ? payload.meal_type : "snack",
+  };
+}
+
 export async function sendChatMessage(
   message: string,
   history: { role: string; content: string }[],
@@ -108,11 +133,7 @@ export function parseFoodLogBlock(text: string): FoodLogPayload | null {
   if (!match) return null;
   try {
     const parsed = JSON.parse(match[1].trim()) as FoodLogPayload;
-    const validMealTypes = ["breakfast", "lunch", "dinner", "snack"];
-    if (!validMealTypes.includes(parsed.meal_type)) {
-      parsed.meal_type = "snack";
-    }
-    return parsed;
+    return sanitizeFoodLogPayload(parsed);
   } catch {
     return null;
   }
@@ -144,7 +165,12 @@ Return ONLY a valid JSON object — no markdown, no explanation:
 }
 
 meal_type must be one of: breakfast, lunch, dinner, snack. Use snack if unclear.
-All numbers must be realistic estimates based on what you see. Return only the JSON, nothing else.`;
+All numbers must be realistic estimates based on what you see.
+Sugar guidance:
+- Always estimate sugar_g explicitly. Do not leave it at 0 unless the food would realistically have almost no sugar.
+- Include natural sugar from fruit and dairy plus added sugar from sauces, syrups, desserts, sweet drinks, granola, and sweetened yogurt.
+- sugar_g must not exceed carbs_g.
+Return only the JSON, nothing else.`;
 
   const response = await getClient().chat.completions.create({
     model: "gpt-4o",
@@ -167,9 +193,7 @@ All numbers must be realistic estimates based on what you see. Return only the J
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("OpenAI did not return valid JSON");
   const parsed = JSON.parse(jsonMatch[0]) as FoodLogPayload;
-  const validMealTypes = ["breakfast", "lunch", "dinner", "snack"];
-  if (!validMealTypes.includes(parsed.meal_type)) parsed.meal_type = "snack";
-  return parsed;
+  return sanitizeFoodLogPayload(parsed);
 }
 
 export async function estimateMacrosFromImages(
@@ -199,7 +223,12 @@ Return ONLY a valid JSON object:
 }
 
 meal_type must be one of: breakfast, lunch, dinner, snack. Use snack if unclear.
-All numbers must be realistic estimates. Return only the JSON.`;
+All numbers must be realistic estimates.
+Sugar guidance:
+- Always estimate sugar_g explicitly across the full meal.
+- Include natural sugar from fruit and dairy plus added sugar from sauces, syrups, desserts, sweet drinks, granola, and sweetened yogurt.
+- sugar_g must not exceed carbs_g.
+Return only the JSON.`;
 
   const content: OpenAI.Chat.ChatCompletionContentPart[] = [
     ...images.map((image) => ({
@@ -219,9 +248,7 @@ All numbers must be realistic estimates. Return only the JSON.`;
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("OpenAI did not return valid JSON");
   const parsed = JSON.parse(jsonMatch[0]) as FoodLogPayload;
-  const validMealTypes = ["breakfast", "lunch", "dinner", "snack"];
-  if (!validMealTypes.includes(parsed.meal_type)) parsed.meal_type = "snack";
-  return parsed;
+  return sanitizeFoodLogPayload(parsed);
 }
 
 export async function estimateMacros(description: string): Promise<FoodLogPayload> {
@@ -241,12 +268,18 @@ Return ONLY a valid JSON object — no markdown, no explanation:
   "carbs_g": 0,
   "fat_g": 0,
   "fiber_g": 0,
+  "sugar_g": 0,
   "sodium_mg": 0,
   "meal_type": "snack"
 }
 
 meal_type must be one of: breakfast, lunch, dinner, snack. Use snack if unclear.
-All numbers must be realistic estimates. Return only the JSON, nothing else.`,
+All numbers must be realistic estimates.
+Sugar guidance:
+- Always estimate sugar_g explicitly. Do not default it to 0 for fruit, milk, yogurt, granola, sweet coffee drinks, sauces, desserts, or packaged snacks.
+- Include both natural sugar and added sugar.
+- sugar_g must not exceed carbs_g.
+Return only the JSON, nothing else.`,
       },
     ],
   });
@@ -255,7 +288,5 @@ All numbers must be realistic estimates. Return only the JSON, nothing else.`,
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("OpenAI did not return valid JSON");
   const parsed = JSON.parse(jsonMatch[0]) as FoodLogPayload;
-  const validMealTypes = ["breakfast", "lunch", "dinner", "snack"];
-  if (!validMealTypes.includes(parsed.meal_type)) parsed.meal_type = "snack";
-  return parsed;
+  return sanitizeFoodLogPayload(parsed);
 }

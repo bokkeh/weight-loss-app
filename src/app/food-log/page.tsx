@@ -300,6 +300,7 @@ interface FrequentFood {
   carbs_g: number;
   fat_g: number;
   fiber_g: number;
+  sugar_g: number;
   sodium_mg: number;
   count: number;
   lastLoggedAt: string;
@@ -332,6 +333,7 @@ function buildFrequentFoods(entries: FoodLogEntry[]): FrequentFood[] {
         carbs_g: Number(entry.carbs_g),
         fat_g: Number(entry.fat_g),
         fiber_g: Number(entry.fiber_g),
+        sugar_g: Number(entry.sugar_g ?? 0),
         sodium_mg: Number(entry.sodium_mg),
         count: 1,
         lastLoggedAt: entry.created_at,
@@ -347,6 +349,7 @@ function buildFrequentFoods(entries: FoodLogEntry[]): FrequentFood[] {
       existing.carbs_g = Number(entry.carbs_g);
       existing.fat_g = Number(entry.fat_g);
       existing.fiber_g = Number(entry.fiber_g);
+      existing.sugar_g = Number(entry.sugar_g ?? 0);
       existing.sodium_mg = Number(entry.sodium_mg);
       existing.lastLoggedAt = entry.created_at;
     }
@@ -389,6 +392,7 @@ async function buildGoalsSnapshotImage(totals: DailyMacroTotals, date: Date, goa
     { label: "Carbs", value: totals.carbs_g, goal: goals.carbs_g, unit: "g", color: "#eab308" },
     { label: "Fat", value: totals.fat_g, goal: goals.fat_g, unit: "g", color: "#ef4444" },
     { label: "Fiber", value: totals.fiber_g, goal: goals.fiber_g, unit: "g", color: "#22c55e" },
+    { label: "Sugar", value: totals.sugar_g, goal: goals.sugar_g, unit: "g", color: "#ec4899" },
     { label: "Sodium", value: totals.sodium_mg, goal: goals.sodium_mg, unit: "mg", color: "#06b6d4" },
   ];
 
@@ -566,6 +570,7 @@ export default function FoodLogPage() {
           carbs_g: item.carbs_g,
           fat_g: item.fat_g,
           fiber_g: item.fiber_g,
+          sugar_g: item.sugar_g,
           sodium_mg: item.sodium_mg,
           source: "manual",
         }),
@@ -823,7 +828,7 @@ export default function FoodLogPage() {
               ) : isFirstMealExperience ? (
                 <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground space-y-2">
                   <p>No meals logged yet. Your progress bars will populate after your first entry.</p>
-                  <p>Daily targets: {goals.calories.toFixed(0)} kcal, {goals.protein_g.toFixed(0)}g protein, {goals.carbs_g.toFixed(0)}g carbs, {goals.fat_g.toFixed(0)}g fat, {goals.fiber_g.toFixed(0)}g fiber, {goals.sodium_mg.toFixed(0)}mg sodium.</p>
+                  <p>Daily targets: {goals.calories.toFixed(0)} kcal, {goals.protein_g.toFixed(0)}g protein, {goals.carbs_g.toFixed(0)}g carbs, {goals.fat_g.toFixed(0)}g fat, {goals.fiber_g.toFixed(0)}g fiber, {goals.sugar_g.toFixed(0)}g sugar, {goals.sodium_mg.toFixed(0)}mg sodium.</p>
                 </div>
               ) : (
                 <MacroProgressBars totals={totals} goals={goals} />
@@ -868,5 +873,4 @@ export default function FoodLogPage() {
     </div>
   );
 }
-
 

@@ -63,6 +63,9 @@ export function QuickLogBar({ date, onAdded }: Props) {
     protein_g: number;
     carbs_g: number;
     fat_g: number;
+    fiber_g?: number;
+    sugar_g?: number;
+    sodium_mg?: number;
   }>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -200,6 +203,7 @@ export function QuickLogBar({ date, onAdded }: Props) {
             <span><strong>{preview.protein_g.toFixed(1)}g</strong> protein</span>
             <span><strong>{preview.carbs_g.toFixed(1)}g</strong> carbs</span>
             <span><strong>{preview.fat_g.toFixed(1)}g</strong> fat</span>
+            <span><strong>{Number(preview.sugar_g ?? 0).toFixed(1)}g</strong> sugar</span>
           </span>
         </div>
       )}
