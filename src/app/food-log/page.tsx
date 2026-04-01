@@ -15,6 +15,7 @@ import { FoodEntryForm } from "@/components/food-log/FoodEntryForm";
 import { FoodLogTable } from "@/components/food-log/FoodLogTable";
 import { MacroProgressBars } from "@/components/food-log/MacroProgressBars";
 import { QuickLogBar } from "@/components/food-log/QuickLogBar";
+import { WaterWidget } from "@/components/dashboard/WaterWidget";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FoodLogEntry, DailyMacroTotals } from "@/types";
 import { localDateStr } from "@/lib/utils";
@@ -835,6 +836,14 @@ export default function FoodLogPage() {
               )}
             </CardContent>
           </Card>
+          {!loading && (
+            <div className="mt-6">
+              <WaterWidget
+                sodiumMgToday={totals.sodium_mg}
+                hasFoodLogged={entries.length > 0}
+              />
+            </div>
+          )}
         </div>
 
         <div className="lg:col-span-2">
@@ -873,4 +882,3 @@ export default function FoodLogPage() {
     </div>
   );
 }
-
