@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { handleApiError } from "@/lib/api";
 import { requireUserId } from "@/lib/route-auth";
+import { localDateStr } from "@/lib/utils";
 
 function shiftDay(dayStr: string, offset: number): string {
   const [y, m, d] = dayStr.split("-").map(Number);
@@ -38,7 +40,7 @@ export async function GET(req: Request) {
     const daySet = new Set(days);
     let streak = 0;
 
-    const todayStr = clientToday ?? new Date().toISOString().split("T")[0];
+    const todayStr = clientToday ?? localDateStr();
     const yesterdayStr = shiftDay(todayStr, -1);
 
     let cursor: string | null = daySet.has(todayStr)
@@ -70,6 +72,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ streak, weeklyAvgCalories });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return handleApiError(error, "Failed to load stats");
   }
 }

@@ -1,53 +1,8 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { handleApiError, parseJsonBody } from "@/lib/api";
 import { requireUserId } from "@/lib/route-auth";
-
-async function ensureProfileTable() {
-  try {
-    await sql`
-      CREATE TABLE IF NOT EXISTS user_profiles (
-        id                    SERIAL PRIMARY KEY,
-        first_name            TEXT,
-        last_name             TEXT,
-        email                 TEXT,
-        phone                 TEXT,
-        profile_image_url     TEXT,
-        account_type          TEXT NOT NULL DEFAULT 'regular',
-        dietary_restrictions  TEXT[],
-        calorie_goal          NUMERIC,
-        protein_goal_g        NUMERIC,
-        carbs_goal_g          NUMERIC,
-        fat_goal_g            NUMERIC,
-        fiber_goal_g          NUMERIC,
-        sodium_goal_mg        NUMERIC,
-        height_in             NUMERIC,
-        goal_weight_lbs       NUMERIC,
-        onboarding_completed  BOOLEAN NOT NULL DEFAULT FALSE,
-        created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `;
-    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS calorie_goal NUMERIC`;
-    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'regular'`;
-    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS protein_goal_g NUMERIC`;
-    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS carbs_goal_g NUMERIC`;
-    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fat_goal_g NUMERIC`;
-    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fiber_goal_g NUMERIC`;
-    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS sugar_goal_g NUMERIC`;
-    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS sodium_goal_mg NUMERIC`;
-    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS height_in NUMERIC`;
-    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS goal_weight_lbs NUMERIC`;
-    await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE`;
-  } catch (error) {
-    console.error("ensureProfileTable failed:", error);
-  }
-}
-
-function parseNumeric(value: unknown): number | null {
-  if (value == null || value === "") return null;
-  const num = Number(value);
-  return Number.isFinite(num) ? num : null;
-}
+import { updateProfileSchema } from "@/lib/validation";
 
 export async function GET(req: Request) {
   try {
@@ -55,7 +10,6 @@ export async function GET(req: Request) {
     if ("response" in authState) return authState.response;
     const { userId } = authState;
 
-    await ensureProfileTable();
     const [profile] = await sql`
       SELECT
         id, first_name, last_name, email, phone, profile_image_url, account_type, dietary_restrictions,
@@ -81,7 +35,7 @@ export async function GET(req: Request) {
     `;
     return NextResponse.json(created);
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return handleApiError(error, "Failed to load profile");
   }
 }
 
@@ -91,8 +45,7 @@ export async function PUT(req: Request) {
     if ("response" in authState) return authState.response;
     const { userId } = authState;
 
-    await ensureProfileTable();
-    const body = await req.json().catch(() => ({}));
+    const body = await parseJsonBody(req, updateProfileSchema);
     const {
       first_name,
       last_name,
@@ -100,7 +53,6 @@ export async function PUT(req: Request) {
       phone,
       dietary_restrictions,
       profile_image_url,
-      account_type,
       calorie_goal,
       protein_goal_g,
       carbs_goal_g,
@@ -111,16 +63,7 @@ export async function PUT(req: Request) {
       height_in,
       goal_weight_lbs,
       onboarding_completed,
-    } = body as Record<string, unknown>;
-
-    const restrictions = Array.isArray(dietary_restrictions)
-      ? dietary_restrictions.map((v) => String(v).trim()).filter(Boolean)
-      : null;
-
-    const normalizedAccountType =
-      account_type === "personal_trainer" || account_type === "admin" || account_type === "regular"
-        ? account_type
-        : null;
+    } = body;
 
     const [profile] = await sql`
       INSERT INTO user_profiles (
@@ -130,43 +73,42 @@ export async function PUT(req: Request) {
       )
       VALUES (
         ${userId},
-        ${first_name ? String(first_name).trim() : null},
-        ${last_name ? String(last_name).trim() : null},
-        ${email ? String(email).trim() : null},
-        ${phone ? String(phone).trim() : null},
-        ${restrictions},
-        ${profile_image_url ? String(profile_image_url).trim() : null},
-        ${normalizedAccountType ?? "regular"},
-        ${parseNumeric(calorie_goal)},
-        ${parseNumeric(protein_goal_g)},
-        ${parseNumeric(carbs_goal_g)},
-        ${parseNumeric(fat_goal_g)},
-        ${parseNumeric(fiber_goal_g)},
-        ${parseNumeric(sugar_goal_g)},
-        ${parseNumeric(sodium_goal_mg)},
-        ${parseNumeric(height_in)},
-        ${parseNumeric(goal_weight_lbs)},
-        ${typeof onboarding_completed === "boolean" ? onboarding_completed : false}
+        ${first_name ?? null},
+        ${last_name ?? null},
+        ${email ?? null},
+        ${phone ?? null},
+        ${dietary_restrictions ?? null},
+        ${profile_image_url ?? null},
+        'regular',
+        ${calorie_goal ?? null},
+        ${protein_goal_g ?? null},
+        ${carbs_goal_g ?? null},
+        ${fat_goal_g ?? null},
+        ${fiber_goal_g ?? null},
+        ${sugar_goal_g ?? null},
+        ${sodium_goal_mg ?? null},
+        ${height_in ?? null},
+        ${goal_weight_lbs ?? null},
+        ${onboarding_completed ?? false}
       )
       ON CONFLICT (id) DO UPDATE SET
-        first_name = COALESCE(${first_name ? String(first_name).trim() : null}, user_profiles.first_name),
-        last_name = COALESCE(${last_name ? String(last_name).trim() : null}, user_profiles.last_name),
-        email = COALESCE(${email ? String(email).trim() : null}, user_profiles.email),
-        phone = COALESCE(${phone ? String(phone).trim() : null}, user_profiles.phone),
-        dietary_restrictions = COALESCE(${restrictions}, user_profiles.dietary_restrictions),
-        profile_image_url = COALESCE(${profile_image_url ? String(profile_image_url).trim() : null}, user_profiles.profile_image_url),
-        account_type = COALESCE(${normalizedAccountType}, user_profiles.account_type),
-        calorie_goal = COALESCE(${parseNumeric(calorie_goal)}, user_profiles.calorie_goal),
-        protein_goal_g = COALESCE(${parseNumeric(protein_goal_g)}, user_profiles.protein_goal_g),
-        carbs_goal_g = COALESCE(${parseNumeric(carbs_goal_g)}, user_profiles.carbs_goal_g),
-        fat_goal_g = COALESCE(${parseNumeric(fat_goal_g)}, user_profiles.fat_goal_g),
-        fiber_goal_g = COALESCE(${parseNumeric(fiber_goal_g)}, user_profiles.fiber_goal_g),
-        sugar_goal_g = COALESCE(${parseNumeric(sugar_goal_g)}, user_profiles.sugar_goal_g),
-        sodium_goal_mg = COALESCE(${parseNumeric(sodium_goal_mg)}, user_profiles.sodium_goal_mg),
-        height_in = COALESCE(${parseNumeric(height_in)}, user_profiles.height_in),
-        goal_weight_lbs = COALESCE(${parseNumeric(goal_weight_lbs)}, user_profiles.goal_weight_lbs),
+        first_name = COALESCE(${first_name ?? null}, user_profiles.first_name),
+        last_name = COALESCE(${last_name ?? null}, user_profiles.last_name),
+        email = COALESCE(${email ?? null}, user_profiles.email),
+        phone = COALESCE(${phone ?? null}, user_profiles.phone),
+        dietary_restrictions = COALESCE(${dietary_restrictions ?? null}, user_profiles.dietary_restrictions),
+        profile_image_url = COALESCE(${profile_image_url ?? null}, user_profiles.profile_image_url),
+        calorie_goal = COALESCE(${calorie_goal ?? null}, user_profiles.calorie_goal),
+        protein_goal_g = COALESCE(${protein_goal_g ?? null}, user_profiles.protein_goal_g),
+        carbs_goal_g = COALESCE(${carbs_goal_g ?? null}, user_profiles.carbs_goal_g),
+        fat_goal_g = COALESCE(${fat_goal_g ?? null}, user_profiles.fat_goal_g),
+        fiber_goal_g = COALESCE(${fiber_goal_g ?? null}, user_profiles.fiber_goal_g),
+        sugar_goal_g = COALESCE(${sugar_goal_g ?? null}, user_profiles.sugar_goal_g),
+        sodium_goal_mg = COALESCE(${sodium_goal_mg ?? null}, user_profiles.sodium_goal_mg),
+        height_in = COALESCE(${height_in ?? null}, user_profiles.height_in),
+        goal_weight_lbs = COALESCE(${goal_weight_lbs ?? null}, user_profiles.goal_weight_lbs),
         onboarding_completed = COALESCE(
-          ${typeof onboarding_completed === "boolean" ? onboarding_completed : null},
+          ${onboarding_completed ?? null},
           user_profiles.onboarding_completed
         )
       RETURNING
@@ -179,6 +121,6 @@ export async function PUT(req: Request) {
 
     return NextResponse.json(profile);
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return handleApiError(error, "Failed to update profile");
   }
 }

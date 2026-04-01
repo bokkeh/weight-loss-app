@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { handleApiError } from "@/lib/api";
 import { requireAdminUser } from "@/lib/route-auth";
 
 export async function GET() {
@@ -7,20 +8,6 @@ export async function GET() {
   if ("response" in adminState) return adminState.response;
 
   try {
-    await sql`
-      CREATE TABLE IF NOT EXISTS user_data_preferences (
-        user_id        INTEGER PRIMARY KEY,
-        share_profile  BOOLEAN NOT NULL DEFAULT TRUE,
-        share_weight   BOOLEAN NOT NULL DEFAULT TRUE,
-        share_food     BOOLEAN NOT NULL DEFAULT TRUE,
-        share_water    BOOLEAN NOT NULL DEFAULT TRUE,
-        share_recipes  BOOLEAN NOT NULL DEFAULT TRUE,
-        share_chat     BOOLEAN NOT NULL DEFAULT TRUE,
-        share_family   BOOLEAN NOT NULL DEFAULT TRUE,
-        updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `;
-
     const users = await sql`
       WITH all_user_ids AS (
         SELECT id AS user_id FROM user_profiles
@@ -77,6 +64,6 @@ export async function GET() {
 
     return NextResponse.json({ users, daily });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return handleApiError(error, "Failed to load admin users");
   }
 }

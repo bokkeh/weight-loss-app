@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { handleApiError, parseJsonBody } from "@/lib/api";
 import { requireUserId } from "@/lib/route-auth";
 import {
   sendChatMessage,
@@ -7,7 +8,8 @@ import {
   stripFoodLogBlock,
   type VisionImageInput,
 } from "@/lib/gemini";
-import { formatFoodName } from "@/lib/utils";
+import { formatFoodName, localDateStr } from "@/lib/utils";
+import { chatRequestSchema } from "@/lib/validation";
 
 export async function GET(req: Request) {
   const authState = await requireUserId(req);
@@ -24,7 +26,7 @@ export async function GET(req: Request) {
     `;
     return NextResponse.json(messages);
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return handleApiError(error, "Failed to load chat history");
   }
 }
 
@@ -34,14 +36,8 @@ export async function POST(req: Request) {
   const { userId } = authState;
 
   try {
-    const body = await req.json();
-    const {
-      message,
-      images,
-    } = body as {
-      message?: string;
-      images?: VisionImageInput[];
-    };
+    const body = await parseJsonBody(req, chatRequestSchema);
+    const { message, images } = body as { message?: string; images?: VisionImageInput[] };
 
     const trimmedMessage = String(message ?? "").trim();
     const safeImages = Array.isArray(images)
@@ -64,7 +60,7 @@ export async function POST(req: Request) {
     `;
 
     // Fetch today's food log for context
-    const today = new Date().toISOString().split("T")[0];
+    const today = localDateStr();
     const todayFood = await sql`
       SELECT food_name, serving_size, calories::float, protein_g::float,
              carbs_g::float, fat_g::float, meal_type
@@ -124,7 +120,7 @@ export async function POST(req: Request) {
     let foodLogEntry = null;
 
     if (foodPayload) {
-      const today = new Date().toISOString().split("T")[0];
+      const today = localDateStr();
       const normalizedFoodName = formatFoodName(String(foodPayload.food_name ?? ""));
       if (!normalizedFoodName) {
         return NextResponse.json({ error: "Unable to parse food name from AI response." }, { status: 400 });
@@ -183,8 +179,7 @@ export async function POST(req: Request) {
       foodLogged: foodLogEntry,
     });
   } catch (error) {
-    console.error("Chat error:", error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return handleApiError(error, "Failed to process chat message");
   }
 }
 
@@ -197,6 +192,6 @@ export async function DELETE(req: Request) {
     await sql`DELETE FROM chat_messages WHERE user_id = ${userId}`;
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return handleApiError(error, "Failed to clear chat history");
   }
 }

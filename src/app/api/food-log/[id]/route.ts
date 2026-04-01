@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { handleApiError, notFound, parseJsonBody } from "@/lib/api";
 import { requireUserId } from "@/lib/route-auth";
 import { formatFoodName } from "@/lib/utils";
-
-async function ensureFoodLogColumns() {
-  await sql`
-    ALTER TABLE food_log_entries
-    ADD COLUMN IF NOT EXISTS display_order NUMERIC(12,2)
-  `;
-}
+import { deleteByIdSchema, updateFoodLogSchema } from "@/lib/validation";
 
 export async function PATCH(
   req: Request,
@@ -20,9 +15,8 @@ export async function PATCH(
   const { userId } = authState;
 
   try {
-    await ensureFoodLogColumns();
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-    const targetId = Number(id);
+    const body = await parseJsonBody(req, updateFoodLogSchema);
+    const { id: targetId } = deleteByIdSchema.parse({ id });
     const [existing] = await sql`
       SELECT id, logged_at::text, meal_type, display_order::float, food_name, serving_size,
              calories::float, protein_g::float, carbs_g::float, fat_g::float, fiber_g::float, sugar_g::float, sodium_mg::float,
@@ -32,28 +26,25 @@ export async function PATCH(
         AND user_id = ${userId}
       LIMIT 1
     `;
-    if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!existing) return notFound();
 
-    const has = (key: string) => Object.prototype.hasOwnProperty.call(body, key);
-    const nextFoodName = has("food_name")
-      ? formatFoodName(String(body.food_name ?? ""))
+    const nextFoodName = body.food_name
+      ? formatFoodName(body.food_name)
       : formatFoodName(String(existing.food_name));
     if (!nextFoodName) {
       return NextResponse.json({ error: "food_name is required" }, { status: 400 });
     }
 
-    const nextServing = has("serving_size") ? (body.serving_size ? String(body.serving_size) : null) : existing.serving_size;
-    const nextMealType = has("meal_type") ? (body.meal_type ? String(body.meal_type) : null) : existing.meal_type;
-    const nextOrder = has("display_order")
-      ? (body.display_order == null ? null : Number(body.display_order))
-      : existing.display_order;
-    const nextCalories = has("calories") ? Number(body.calories ?? 0) : Number(existing.calories);
-    const nextProtein = has("protein_g") ? Number(body.protein_g ?? 0) : Number(existing.protein_g);
-    const nextCarbs = has("carbs_g") ? Number(body.carbs_g ?? 0) : Number(existing.carbs_g);
-    const nextFat = has("fat_g") ? Number(body.fat_g ?? 0) : Number(existing.fat_g);
-    const nextFiber = has("fiber_g") ? Number(body.fiber_g ?? 0) : Number(existing.fiber_g);
-    const nextSugar = has("sugar_g") ? Number(body.sugar_g ?? 0) : Number(existing.sugar_g ?? 0);
-    const nextSodium = has("sodium_mg") ? Number(body.sodium_mg ?? 0) : Number(existing.sodium_mg);
+    const nextServing = body.serving_size !== undefined ? body.serving_size : existing.serving_size;
+    const nextMealType = body.meal_type !== undefined ? body.meal_type : existing.meal_type;
+    const nextOrder = body.display_order !== undefined ? body.display_order : existing.display_order;
+    const nextCalories = body.calories ?? Number(existing.calories);
+    const nextProtein = body.protein_g ?? Number(existing.protein_g);
+    const nextCarbs = body.carbs_g ?? Number(existing.carbs_g);
+    const nextFat = body.fat_g ?? Number(existing.fat_g);
+    const nextFiber = body.fiber_g ?? Number(existing.fiber_g);
+    const nextSugar = body.sugar_g ?? Number(existing.sugar_g ?? 0);
+    const nextSodium = body.sodium_mg ?? Number(existing.sodium_mg);
 
     const [entry] = await sql`
       UPDATE food_log_entries
@@ -74,10 +65,10 @@ export async function PATCH(
                 calories::float, protein_g::float, carbs_g::float, fat_g::float,
                 fiber_g::float, sugar_g::float, sodium_mg::float, source, recipe_id, created_at::text
     `;
-    if (!entry) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!entry) return notFound();
     return NextResponse.json(entry);
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return handleApiError(error, "Failed to update food log entry");
   }
 }
 
@@ -91,17 +82,18 @@ export async function DELETE(
   const { userId } = authState;
 
   try {
+    const { id: targetId } = deleteByIdSchema.parse({ id });
     const [deleted] = await sql`
       DELETE FROM food_log_entries
-      WHERE id = ${Number(id)}
+      WHERE id = ${targetId}
         AND user_id = ${userId}
       RETURNING id
     `;
     if (!deleted) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return notFound();
     }
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return handleApiError(error, "Failed to delete food log entry");
   }
 }

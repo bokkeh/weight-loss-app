@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { handleApiError } from "@/lib/api";
 import { ensureMultiUserSchema } from "@/lib/auth-user";
 
 export async function POST(req: Request) {
@@ -25,6 +26,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return handleApiError(error, "Failed to record sign-in event");
   }
 }

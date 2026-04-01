@@ -1,26 +1,22 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { handleApiError, parseJsonBody } from "@/lib/api";
 import { requireUserId } from "@/lib/route-auth";
-import { formatFoodName } from "@/lib/utils";
-
-async function ensureFoodLogColumns() {
-  await sql`
-    ALTER TABLE food_log_entries
-    ADD COLUMN IF NOT EXISTS display_order NUMERIC(12,2)
-  `;
-}
+import { formatFoodName, localDateStr } from "@/lib/utils";
+import { createFoodLogSchema, isoDateSchema } from "@/lib/validation";
 
 export async function GET(req: Request) {
   const authState = await requireUserId(req);
   if ("response" in authState) return authState.response;
   const { userId } = authState;
 
-  const { searchParams } = new URL(req.url);
-  const date = searchParams.get("date");
-  const weeks = parseInt(searchParams.get("weeks") ?? "1", 10);
-
   try {
-    await ensureFoodLogColumns();
+    const { searchParams } = new URL(req.url);
+    const rawDate = searchParams.get("date");
+    const rawWeeks = searchParams.get("weeks");
+    const date = rawDate ? isoDateSchema.parse(rawDate) : null;
+    const weeks = rawWeeks ? Math.min(520, Math.max(1, Number.parseInt(rawWeeks, 10) || 1)) : 1;
+
     let entries;
     if (date) {
       entries = await sql`
@@ -45,7 +41,7 @@ export async function GET(req: Request) {
     }
     return NextResponse.json(entries);
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return handleApiError(error, "Failed to load food log");
   }
 }
 
@@ -55,8 +51,7 @@ export async function POST(req: Request) {
   const { userId } = authState;
 
   try {
-    await ensureFoodLogColumns();
-    const body = await req.json();
+    const body = await parseJsonBody(req, createFoodLogSchema);
     const {
       logged_at,
       meal_type,
@@ -69,19 +64,15 @@ export async function POST(req: Request) {
       fiber_g,
       sugar_g,
       sodium_mg,
-      source = "manual",
+      source,
       recipe_id,
     } = body;
-
-    if (!food_name) {
-      return NextResponse.json({ error: "food_name is required" }, { status: 400 });
-    }
     const normalizedFoodName = formatFoodName(String(food_name));
     if (!normalizedFoodName) {
       return NextResponse.json({ error: "food_name is required" }, { status: 400 });
     }
 
-    const resolvedDate = logged_at ?? new Date().toISOString().split("T")[0];
+    const resolvedDate = logged_at ?? localDateStr();
     const [orderRow] = await sql`
       SELECT COALESCE(MAX(display_order), 0)::float AS max_order
       FROM food_log_entries
@@ -101,13 +92,13 @@ export async function POST(req: Request) {
         ${nextOrder},
         ${normalizedFoodName},
         ${serving_size ?? null},
-        ${Number(calories) || 0},
-        ${Number(protein_g) || 0},
-        ${Number(carbs_g) || 0},
-        ${Number(fat_g) || 0},
-        ${Number(fiber_g) || 0},
-        ${Number(sugar_g) || 0},
-        ${Number(sodium_mg) || 0},
+        ${calories},
+        ${protein_g},
+        ${carbs_g},
+        ${fat_g},
+        ${fiber_g},
+        ${sugar_g},
+        ${sodium_mg},
         ${source},
         ${recipe_id ?? null}
       )
@@ -118,6 +109,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json(entry, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return handleApiError(error, "Failed to create food log entry");
   }
 }

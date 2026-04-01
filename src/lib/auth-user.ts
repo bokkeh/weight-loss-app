@@ -80,6 +80,7 @@ async function ensureMultiUserSchemaInternal() {
   await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS carbs_goal_g NUMERIC`;
   await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fat_goal_g NUMERIC`;
   await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fiber_goal_g NUMERIC`;
+  await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS sugar_goal_g NUMERIC`;
   await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS sodium_goal_mg NUMERIC`;
   await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS height_in NUMERIC`;
   await sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS goal_weight_lbs NUMERIC`;
@@ -216,6 +217,7 @@ async function ensureMultiUserSchemaInternal() {
   await sql`CREATE INDEX IF NOT EXISTS idx_recipes_user_id ON recipes (user_id)`;
 
   await sql`ALTER TABLE food_log_entries ADD COLUMN IF NOT EXISTS user_id INTEGER`;
+  await sql`ALTER TABLE food_log_entries ADD COLUMN IF NOT EXISTS display_order NUMERIC(12,2)`;
   await sql`UPDATE food_log_entries SET user_id = 1 WHERE user_id IS NULL`;
   await sql`ALTER TABLE food_log_entries ALTER COLUMN user_id SET DEFAULT 1`;
   await sql`ALTER TABLE food_log_entries ALTER COLUMN user_id SET NOT NULL`;
