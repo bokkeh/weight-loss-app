@@ -17,7 +17,7 @@ interface ImageData {
   preview: string;
 }
 
-const MAX_IMAGES = 5;
+const MAX_IMAGES = 4;
 
 function resizeImage(file: File): Promise<ImageData> {
   return new Promise((resolve, reject) => {

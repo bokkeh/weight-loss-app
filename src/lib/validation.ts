@@ -108,6 +108,7 @@ export const chatImageSchema = z.object({
 export const chatRequestSchema = z.object({
   message: z.string().trim().max(4000, "Message is too long").optional(),
   images: z.array(chatImageSchema).max(4, "You can upload up to 4 images").optional(),
+  logged_at: isoDateSchema.optional(),
 });
 
 export const foodEstimateSchema = z.object({

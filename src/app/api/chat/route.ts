@@ -37,7 +37,11 @@ export async function POST(req: Request) {
 
   try {
     const body = await parseJsonBody(req, chatRequestSchema);
-    const { message, images } = body as { message?: string; images?: VisionImageInput[] };
+    const { message, images, logged_at } = body as {
+      message?: string;
+      images?: VisionImageInput[];
+      logged_at?: string;
+    };
 
     const trimmedMessage = String(message ?? "").trim();
     const safeImages = Array.isArray(images)
@@ -60,7 +64,7 @@ export async function POST(req: Request) {
     `;
 
     // Fetch today's food log for context
-    const today = localDateStr();
+    const today = logged_at ?? localDateStr();
     const todayFood = await sql`
       SELECT food_name, serving_size, calories::float, protein_g::float,
              carbs_g::float, fat_g::float, meal_type
@@ -120,7 +124,7 @@ export async function POST(req: Request) {
     let foodLogEntry = null;
 
     if (foodPayload) {
-      const today = localDateStr();
+      const today = logged_at ?? localDateStr();
       const normalizedFoodName = formatFoodName(String(foodPayload.food_name ?? ""));
       if (!normalizedFoodName) {
         return NextResponse.json({ error: "Unable to parse food name from AI response." }, { status: 400 });

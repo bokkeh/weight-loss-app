@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FoodLogConfirmCard } from "@/components/chat/FoodLogConfirmCard";
 import { ChatMessage, FoodLogEntry } from "@/types";
+import { localDateStr } from "@/lib/utils";
 import { Send, Trash2, Bot, User, Mic, MicOff, ImagePlus, Volume2, VolumeX, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -217,7 +218,11 @@ export default function ChatPage() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, images: imagePayload }),
+        body: JSON.stringify({
+          message: text,
+          images: imagePayload,
+          logged_at: localDateStr(),
+        }),
       });
 
       const data = await res.json();
@@ -307,7 +312,7 @@ export default function ChatPage() {
               <div>
                 <p className="font-medium">Your AI Nutrition Coach</p>
                 <p className="text-sm mt-1">
-                  Try: "What should I eat to hit 150g of protein today?", upload a food photo, or tap the mic to talk.
+                  Try: &quot;What should I eat to hit 150g of protein today?&quot;, upload a food photo, or tap the mic to talk.
                 </p>
               </div>
             </div>

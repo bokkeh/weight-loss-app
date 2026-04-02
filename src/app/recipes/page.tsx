@@ -25,6 +25,7 @@ import { RecipeForm } from "@/components/recipes/RecipeForm";
 import { RecipeExplorer } from "@/components/recipes/RecipeExplorer";
 import { RecipeImporter } from "@/components/recipes/RecipeImporter";
 import { Recipe } from "@/types";
+import { localDateStr } from "@/lib/utils";
 import { Search, Plus, ChefHat, Sparkles, X, Link2 } from "lucide-react";
 
 type SortKey = "newest" | "name" | "cal-asc" | "cal-desc" | "protein-desc";
@@ -89,12 +90,11 @@ export default function RecipesPage() {
   }
 
   async function handleLogAsFood(recipe: Recipe) {
-    const today = new Date().toISOString().split("T")[0];
     await fetch("/api/food-log", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        logged_at: today,
+        logged_at: localDateStr(),
         food_name: recipe.name,
         serving_size: "1 serving",
         calories: recipe.calories,
